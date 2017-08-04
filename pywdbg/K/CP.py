@@ -1,0 +1,10 @@
+
+INSTALLED  = 0x00000001
+SUPPORTED  = 0x00000002
+ACP        = 0
+OEMCP      = 1
+MACCP      = 2
+THREAD_ACP = 3
+SYMBOL     = 42
+UTF7       = 65000
+UTF8       = 65001

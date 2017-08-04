@@ -1,0 +1,9 @@
+
+IS_ARGUMENT          = 0x00000100
+IS_FLOAT             = 0x00000080
+IS_LOCAL             = 0x00000200
+EXPANSION_LEVEL_MASK = 0x0000000F
+READ_ONLY            = 0x00000020
+IS_ARRAY             = 0x00000040
+EXPANDED             = 0x00000010
+
