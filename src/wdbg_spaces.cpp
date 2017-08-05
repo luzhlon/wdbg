@@ -6,7 +6,7 @@
 
 DbgSpaces *g_spaces;
 
-static void ReadVirtual(Session& rpc, Tuple& args) {
+static void read(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
     if (offset) {
         ULONG size = args[1].Int(0);
@@ -17,7 +17,7 @@ static void ReadVirtual(Session& rpc, Tuple& args) {
     }
 }
 
-static void WriteVirtual(Session& rpc, Tuple& args) {
+static void write(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
     auto data = args[1];
     if (offset && data.isstr()) {
@@ -32,7 +32,7 @@ static void WriteVirtual(Session& rpc, Tuple& args) {
     }
 }
 
-static void ReadStringVirtual(Session& rpc, Tuple& args) {
+static void readstr(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
     ULONG len;
     char buf[10240];
@@ -40,7 +40,7 @@ static void ReadStringVirtual(Session& rpc, Tuple& args) {
     rpc.retn(S_OK == g_hresult ? String::New(buf, len, true) : Value());
 }
 
-static void ReadUnicodeVirtual(Session& rpc, Tuple& args) {
+static void readustr(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
     ULONG codePage = args[1].Int(CP_ACP);
     ULONG len = 0;
@@ -50,9 +50,9 @@ static void ReadUnicodeVirtual(Session& rpc, Tuple& args) {
     rpc.retn(len ? String::New(buf, strlen(buf), true) : Value());
 }
 
-static void ReadPointersVirtual(Session& rpc, Tuple& args) {
+static void readpoi(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
-    ULONG count = args[1].Int(0);
+    ULONG count = args[1].Int(1);
     auto p = (ULONG64 *)alloca(sizeof(ULONG64) * count);
     g_hresult = g_spaces->ReadPointersVirtual(count, offset, p);
     if (S_OK == g_hresult) {
@@ -81,11 +81,11 @@ static void SearchVirtual(Session& rpc, Tuple& args) {
 }
 
 FuncItem debug_spaces_funcs[] = {
-    {"ReadVirtual", ReadVirtual},
-    {"WriteVirtual", WriteVirtual},
-    {"ReadStringVirtual", ReadStringVirtual},
-    {"ReadUnicodeVirtual", ReadUnicodeVirtual},
-    {"ReadPointersVirtual", ReadPointersVirtual},
+    {"read", read},
+    {"write", write},
+    {"readstr", readstr},
+    {"readustr", readustr},
+    {"readpoi", readpoi},
     // {"SearchVirtual", SearchVirtual},
     {nullptr, nullptr}
 };

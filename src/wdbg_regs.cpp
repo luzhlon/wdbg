@@ -38,7 +38,7 @@ static void XValue2DValue(Value &o, DEBUG_VALUE *p, ULONG type) {
 }
 
 // value, type
-static void GetRegValue(Session& rpc, Tuple& args) {
+static void getreg(Session& rpc, Tuple& args) {
     ULONG index;
     DEBUG_VALUE val;
     if (GetRegIndexs(args.begin(), &index) && 
@@ -46,7 +46,7 @@ static void GetRegValue(Session& rpc, Tuple& args) {
         rpc.retn({ DValue2XValue(val), (uint64_t)val.Type});
 }
 // value, type
-static void SetRegValue(Session& rpc, Tuple& args) {
+static void setreg(Session& rpc, Tuple& args) {
     ULONG index;
     DEBUG_VALUE dv;
     GetRegIndexs(args.begin(), &index);
@@ -55,7 +55,7 @@ static void SetRegValue(Session& rpc, Tuple& args) {
     rpc.retn(S_OK == g_hresult);
 }
 // {value}
-static void GetRegValues(Session& rpc, Tuple& args) {
+static void getregs(Session& rpc, Tuple& args) {
     auto indexs = (ULONG*)alloca(sizeof(ULONG) * args.size());
     auto dvs = (DEBUG_VALUE*)alloca(sizeof(DEBUG_VALUE) * args.size());
     GetRegIndexs(args.begin(), indexs, args.size());
@@ -66,7 +66,7 @@ static void GetRegValues(Session& rpc, Tuple& args) {
     rpc.retn(ret);
 }
 
-static void GetInstructionOffset(Session& rpc, Tuple& args) {
+static void ipos(Session& rpc, Tuple& args) {
     ULONG source = args[0].Int(DEBUG_REGSRC_DEBUGGEE);
     ULONG64 offset;
     if (S_OK == g_regs->GetInstructionOffset2(source, &offset))
@@ -74,9 +74,9 @@ static void GetInstructionOffset(Session& rpc, Tuple& args) {
 }
 
 FuncItem debug_regs_funcs[] = {
-    {"GetInstructionOffset", GetInstructionOffset},
-    {"GetRegValue", GetRegValue},
-    {"SetRegValue", SetRegValue},
-    {"GetRegValues", GetRegValues},
+    {"ipos", ipos},
+    {"getreg", getreg},
+    {"setreg", setreg},
+    {"getregs", getregs},
     {nullptr, nullptr}
 };

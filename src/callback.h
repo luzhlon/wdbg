@@ -9,6 +9,27 @@
 
 using namespace xval;
 
+class InputCallback : public IDebugInputCallbacks {
+public:
+    virtual ULONG _stdcall AddRef() { return 0; }
+    virtual ULONG _stdcall Release() { return 1; }
+    virtual HRESULT _stdcall QueryInterface(REFIID id, void **pp) {
+        *pp = NULL;
+        if (IsEqualIID(id, __uuidof(IUnknown)) ||
+            IsEqualIID(id, __uuidof(IDebugInputCallbacks))) {
+            *pp = this, AddRef();
+            return S_OK;
+        }
+        else
+            return E_NOINTERFACE;
+    }
+
+    static bool isinputting;
+
+    virtual HRESULT _stdcall StartInput(ULONG bufsize);
+    virtual HRESULT _stdcall EndInput();
+};
+
 class OutputCallback : public IDebugOutputCallbacks {
 public:
     virtual ULONG _stdcall AddRef() { return 0; }

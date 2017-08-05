@@ -18,8 +18,8 @@ void aux_thread() {
     g_ass->addfunc("heartbeat", [](Session& rpc, Tuple& args) {
         auto n = args[0]; assert(n.isint()); last_num = n;
     });
-    extern void SetInterrupt(Session& rpc, Tuple& args);
-    g_ass->addfunc("SetInterrupt", SetInterrupt);
+    extern void interrupt(Session& rpc, Tuple& args);
+    g_ass->addfunc("interrupt", interrupt);
     // Startup the heartbeat-detect thread
     thread t([](){
         for (uint64_t i = last_num; ; ++i) {

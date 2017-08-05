@@ -6,7 +6,7 @@
 
 DbgControl *g_ctrl;
 
-static void AddOptions(Session& rpc, Tuple& args) {
+static void addopts(Session& rpc, Tuple& args) {
     auto opts = args[0];
     if (opts.isint()) {
         g_hresult = g_ctrl->AddEngineOptions((uint64_t)opts);
@@ -14,20 +14,7 @@ static void AddOptions(Session& rpc, Tuple& args) {
     }
 }
 
-static void Execute(Session& rpc, Tuple& args) {
-    PCSTR cmd = args[0];
-    ULONG flags = args[1].Int(DEBUG_EXECUTE_ECHO);
-    if (cmd) {
-        g_hresult = g_ctrl->Execute(DEBUG_OUTCTL_THIS_CLIENT, cmd, DEBUG_EXECUTE_ECHO);
-        if (g_hresult == S_OK) {
-            ULONG status;
-            g_hresult = g_ctrl->GetExecutionStatus(&status);
-            rpc.retn((uint64_t)status);
-        }
-    }
-}
-
-static void GetExecutionStatus(Session& rpc, Tuple& args) {
+static void status(Session& rpc, Tuple& args) {
     ULONG status;
     g_hresult = g_ctrl->GetExecutionStatus(&status);
     rpc.retn((uint64_t)status);
@@ -41,12 +28,12 @@ static void GetPromptText(Session& rpc, Tuple& args) {
         rpc.retn(String::TRef(buf, len));
 }
 
-void SetInterrupt(Session& rpc, Tuple& args) {
+void interrupt(Session& rpc, Tuple& args) {
     ULONG flag = args[0].Int(DEBUG_INTERRUPT_ACTIVE);
     rpc.retn(S_OK == (g_hresult = g_ctrl->SetInterrupt(flag)));
 }
 
-static void Assemble(Session& rpc, Tuple& args) {
+static void asm_(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0];
     auto str = args[1];
     if (str.isstr()) {
@@ -57,7 +44,7 @@ static void Assemble(Session& rpc, Tuple& args) {
     }
 }
 
-static void Disassemble(Session& rpc, Tuple& args) {
+static void disasm(Session& rpc, Tuple& args) {
     const size_t BUFSIZE = 1024;
     char buffer[BUFSIZE];
     ULONG64 offset = args[0].Int(0);
@@ -71,12 +58,12 @@ static void Disassemble(Session& rpc, Tuple& args) {
     }
 }
 
-static void WaitForEvent(Session& rpc, Tuple& args) {
+static void waitevent(Session& rpc, Tuple& args) {
     g_hresult = g_ctrl->WaitForEvent(0, args[0].Int(INFINITE));
     rpc.retn((int64_t)g_hresult);
 }
 
-static void SetAsmOpts(Session& rpc, Tuple& args) {
+static void asmopts(Session& rpc, Tuple& args) {
     auto opt = args[0];
     if (opt.isint()) {
         g_hresult = g_ctrl->SetAssemblyOptions(opt.Int());
@@ -91,7 +78,7 @@ auto command_s = "command"_x;
 auto thread_s = "thread"_x;
 auto flags_s = "flags"_x;
 
-static void AddBreakpoint(Session& rpc, Tuple& args) {
+static void addbp(Session& rpc, Tuple& args) {
     IDebugBreakpoint2 *bp;
     auto offset = args[0];
     auto opts = args[1];
@@ -126,25 +113,68 @@ static void AssembleOptions(Session& rpc, Tuple& args) {
     }
 }
 
-FuncItem debug_control_funcs[] = {
-    {"AddOptions", AddOptions},
-    {"GetExecutionStatus", GetExecutionStatus},
-    {"GetPromptText", GetPromptText},
-    {"WaitForEvent", WaitForEvent},
-    {"SetInterrupt", SetInterrupt},
-    {"Assemble", Assemble},
-    {"Disassemble", Disassemble},
-    {"Execute", Execute},
-    {"Evaluate", [](Session& rpc, Tuple& args) {
-        auto expr = args[0];
-        ULONG desiredType = args[1].Int(DEBUG_VALUE_INVALID);
-        DEBUG_VALUE dv;
-        if (expr.isstr()) {
-            g_hresult = g_ctrl->Evaluate(expr, desiredType, &dv, nullptr);
-            rpc.retn(S_OK == g_hresult ? wdbg::DValue2XValue(dv) : false);
+static HRESULT SetStatusAndRun(ULONG status) {
+    g_hresult = g_ctrl->SetExecutionStatus(status);
+    if (S_OK == g_hresult)
+        g_hresult = g_ctrl->WaitForEvent(0, INFINITE);
+    return g_hresult;
+}
+
+static void stepinto(Session& rpc, Tuple& args) {
+    ULONG count = args[0].Int(1);
+    while (count--)
+        rpc.retn((uint64_t)SetStatusAndRun(DEBUG_STATUS_STEP_INTO));
+}
+
+static void stepover(Session& rpc, Tuple& args) {
+    ULONG count = args[0].Int(1);
+    while (count--)
+        rpc.retn((uint64_t)SetStatusAndRun(DEBUG_STATUS_STEP_OVER));
+}
+
+static void run(Session& rpc, Tuple& args) {
+    rpc.retn((uint64_t)SetStatusAndRun(DEBUG_STATUS_GO));
+}
+
+static void exec(Session& rpc, Tuple& args) {
+    PCSTR cmd = args[0];
+    ULONG flags = args[1].Int(DEBUG_EXECUTE_ECHO);
+    if (cmd) {
+        g_hresult = g_ctrl->Execute(DEBUG_OUTCTL_THIS_CLIENT, cmd, flags);
+        if (g_hresult == S_OK) {
+            ULONG status;
+            g_hresult = g_ctrl->GetExecutionStatus(&status);
+            if (status != DEBUG_STATUS_BREAK)
+                g_ctrl->WaitForEvent(0, INFINITE);
         }
-    }},
-    {"AddBreakpoint", AddBreakpoint},
-    {"SetAsmOpts", SetAsmOpts},
+        rpc.retn((uint64_t)g_hresult);
+    }
+}
+
+static void eval(Session& rpc, Tuple& args) {
+    auto expr = args[0];
+    ULONG desiredType = args[1].Int(DEBUG_VALUE_INVALID);
+    DEBUG_VALUE dv;
+    if (expr.isstr()) {
+        g_hresult = g_ctrl->Evaluate(expr, desiredType, &dv, nullptr);
+        rpc.retn(S_OK == g_hresult ? wdbg::DValue2XValue(dv) : false);
+    }
+}
+
+FuncItem debug_control_funcs[] = {
+    {"addopts", addopts},
+    {"status", status},
+    // {"GetPromptText", GetPromptText},
+    // {"asm", asm},
+    {"disasm", disasm},
+    {"addbp", addbp},
+    {"asmopts", asmopts},
+    {"interrupt", interrupt},
+    {"stepinto", stepinto},
+    {"stepover", stepover},
+    {"run", run},
+    {"exec", exec},
+    {"eval", eval},
+    {"waitevent", waitevent},
     {nullptr, nullptr}
 };

@@ -24,7 +24,22 @@ namespace wdbg {
         g_hresult = g_client->QueryInterface(__uuidof(DbgSyms), (void **)&g_sysobj);
         assert(g_hresult == S_OK);
         // Set callback object's
+        g_client->SetInputCallbacks(new InputCallback());
         g_client->SetOutputCallbacks(new OutputCallback());
+        g_client->SetEventCallbacks(new EventCallback(
+            DEBUG_EVENT_BREAKPOINT |
+            DEBUG_EVENT_LOAD_MODULE |
+            DEBUG_EVENT_EXCEPTION |
+            DEBUG_EVENT_CREATE_THREAD |
+            DEBUG_EVENT_EXIT_THREAD |
+            DEBUG_EVENT_CREATE_PROCESS |
+            DEBUG_EVENT_EXIT_PROCESS |
+            DEBUG_EVENT_UNLOAD_MODULE |
+            DEBUG_EVENT_SYSTEM_ERROR |
+            DEBUG_EVENT_SESSION_STATUS |
+            DEBUG_EVENT_CHANGE_DEBUGGEE_STATE |
+            DEBUG_EVENT_CHANGE_ENGINE_STATE |
+            DEBUG_EVENT_CHANGE_SYMBOL_STATE));
         // Register the RPC functions
         load_functions();
     }

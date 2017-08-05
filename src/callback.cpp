@@ -1,6 +1,7 @@
 
 #include "handler.h"
 #include "callback.h"
+#include "wdbg.h"
 #include "xval_str.h"
 #include "xval_list.h"
 
@@ -21,6 +22,28 @@ enum EV_INDEX {
 Value ev = List::New(EV_COUNT);
 // Output handler
 Value OutputCallback::onoutput;
+
+bool InputCallback::isinputting = false;
+
+HRESULT InputCallback::StartInput(ULONG bufsize) {
+    isinputting = true;
+    auto str = g_ss->call("input", (uint64_t)bufsize);
+    if (str.isstr()) {
+        const char *p = str;
+        const char *e = p + str.str().size();
+        while (isinputting && p < e) {
+            ULONG size;
+            g_ctrl->Input((char *)p, e - p, &size);
+            p += size;
+        }
+    } else
+        printf("[Input] failure\n");
+    return S_OK;
+}
+
+HRESULT InputCallback::EndInput() {
+    isinputting = false; return S_OK;
+}
 
 HRESULT OutputCallback::Output(IN ULONG Mask, IN PCSTR Text) {
     if (onoutput.isnil()) return S_OK;
