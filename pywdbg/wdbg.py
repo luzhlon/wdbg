@@ -2,7 +2,7 @@
 import srpc
 from K import ERROR, ENGOPT, EVENT, STATUS
 import time
-from threading import Thread
+from threading import Thread, Condition, Lock
 # Breakpoint callbacks
 bp_callback = {}
 # WDbg object
@@ -16,14 +16,19 @@ class AuxHandler:
     def heartbeat(ss, n):
         ss.notify('heartbeat', n)
 
+inp = input
 # Main session's handler
 class MainHandler:
+    def input(ss, data):
+        global inp
+        return inp()
+
     def output(ss, data):
         print(data.decode('gbk'), end = '')
 
     def breakpoint(ss, id, offset):
         global bp_callback
-        print('[Breakpoint]\t%x occured, offset: %x' % (id, offset))
+        # print('[Breakpoint]\t%x occured, offset: %x' % (id, offset))
         ret = None
         if id in bp_callback:
             ret = bp_callback[id](id, offset)
@@ -33,18 +38,57 @@ class MainHandler:
 
 on = MainHandler
 
-class WDbg:
-    def __getattr__(self, name):
-        mss = self._mss
-        def func(*args):
-            return mss.call(name, *args)
-        return func
+backfset = set(['stepinto', 'stepover', 'run', 'waitevent', 'exec'])
 
-    def InitNormally(self):
-        self.AddOptions(ENGOPT.INITIAL_BREAK | ENGOPT.FINAL_BREAK)
+class WDbg:
+    def __init__(self):
+        self._taskcond = Condition()    # condition for waitting task
+        self._compcond = Condition()    # condition for waitting to complete task
+        self._compcond.acquire()
+        def backthread():
+            self._taskcond.acquire()
+            c = self._compcond
+            while True:
+                self._taskcond.wait()
+                self._result = self._fun(*self._args)
+                c.acquire(); c.notify(); c.release()
+        self._back = Thread(target = backthread)
+        self._back.start()
+
+    def __getattr__(self, name):
+        global backfset
+
+        mss = self._mss
+        f = None
+        if name in backfset:
+            def fun(*args):
+                self._args = (name, *args)
+                self._fun = mss.call
+                return self._backrun()
+            f = fun
+        else:
+            def func(*args):
+                return mss.call(name, *args)
+            f = func
+        setattr(self, name, f)
+        return f
+
+    def _backrun(self):
+        c = self._taskcond
+        c.acquire(); c.notify(); c.release()
+        while True:
+            try:
+                if self._compcond.wait(0.2):
+                    break
+            except KeyboardInterrupt:
+                self.interrupt()
+        return self._result
+
+    def init(self):
+        self.addopts(ENGOPT.INITIAL_BREAK | ENGOPT.FINAL_BREAK)
         # output callback
         if getattr(MainHandler, 'output'):
-            self.RegisterOutput('output')
+            self.setoutput('output')
         # register events callbacks
         events = 0
         def reg(eid, fname):
@@ -52,7 +96,7 @@ class WDbg:
             try:
                 getattr(MainHandler, fname)
                 events |= eid
-                self.RegisterEvent(eid, fname)
+                self.setevent(eid, fname)
             except AttributeError:
                 pass
         reg(EVENT.BREAKPOINT, 'breakpoint')
@@ -60,36 +104,21 @@ class WDbg:
         reg(EVENT.CREATE_THREAD, 'createthread')
         reg(EVENT.LOAD_MODULE, 'loadmodule')
         reg(EVENT.EXIT_PROCESS, 'exitprocess')
-        self.SetEventCallbacks(events)
 
-    def SetInterrupt(self):
-        return self._ass.notify('SetInterrupt')
-
-    def WaitEvent(self, *timeout):
-        self._waiting = True
-        def waitevent():
-            self._status = self._mss.call('WaitForEvent', *timeout)
-            self._waiting = False
-        Thread(target=waitevent).start()
-        while self._waiting:
-            try:
-                time.sleep(0.2)
-            except KeyboardInterrupt:
-                self.SetInterrupt()
-        return ERROR.get(self._status, 'FAILURE')
+    def interrupt(self):
+        return self._ass.notify('interrupt')
 
     def cmdloop(self):
-        try:
-            while True:
+        while True:
+            try:
                 cmd = input('> ')
-                b = self.Execute(cmd)
-                if not b:
+                b = self.exec(cmd)
+                if b:
                     print('[Execute failure]', cmd)
-                    break
-                elif b != STATUS.BREAK:
-                    self.WaitEvent()
-        except KeyboardInterrupt:
-            return
+            except EOFError:
+                break
+            except KeyboardInterrupt:
+                break
 
 def connect(addr, port):
     global dbg
