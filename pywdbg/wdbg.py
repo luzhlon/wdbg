@@ -1,8 +1,10 @@
 
+import time, os
 import srpc
 from K import ERROR, ENGOPT, EVENT, STATUS
-import time
 from threading import Thread, Condition, Lock
+
+PATH = __file__
 # Breakpoint callbacks
 bp_callback = {}
 # WDbg object
@@ -90,15 +92,12 @@ class WDbg:
         if getattr(MainHandler, 'output'):
             self.setoutput('output')
         # register events callbacks
-        events = 0
         def reg(eid, fname):
-            nonlocal events
             try:
                 getattr(MainHandler, fname)
-                events |= eid
                 self.setevent(eid, fname)
             except AttributeError:
-                pass
+                return
         reg(EVENT.BREAKPOINT, 'breakpoint')
         reg(EVENT.CREATE_PROCESS, 'createprocess')
         reg(EVENT.CREATE_THREAD, 'createthread')
@@ -120,7 +119,27 @@ class WDbg:
             except KeyboardInterrupt:
                 break
 
-def connect(addr, port):
+def search_wdbg(arch):
+    global PATH
+    assert arch == 'x86' or arch == 'x64'
+
+    curpath = os.path.abspath(PATH)
+    upath = os.path.split(os.path.dirname(curpath))[0]
+    path = [upath + x + arch + '/wdbg.exe'
+            for x in ['/build/debug/', '/bin/']]
+
+    for p in path:
+        if os.path.exists(p):
+            return p
+
+def start(arch = None):
+    '''start the wdbg subprocess'''
+    import subprocess, platform
+    if not arch:
+        arch = 'x64' if platform.architecture()[0] == '64bit' else 'x86'
+    wdbg = subprocess.Popen([search_wdbg(arch), '-D'], stdin = subprocess.PIPE)
+
+def connect(addr = None, port = None):
     global dbg
     if dbg: return None
     dbg = WDbg()
