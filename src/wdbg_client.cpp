@@ -5,9 +5,11 @@
 
 DbgClient *g_client = nullptr;
 
+static ULONG default_create_flags = CREATE_NEW_CONSOLE | DEBUG_CREATE_PROCESS_NO_DEBUG_HEAP | DEBUG_PROCESS;
+
 static void create(Session& rpc, Tuple& args) {
     auto path = args[0];
-    ULONG flags = args[1].Int(DEBUG_CREATE_PROCESS_NO_DEBUG_HEAP | DEBUG_PROCESS);
+    ULONG flags = args[1].Int(default_create_flags);
     if (path.isstr()) {
         g_hresult = g_client->CreateProcess(0, (PSTR)path.str().c_str(), flags);
     }
@@ -20,7 +22,7 @@ static void attach(Session& rpc, Tuple& args) {
         ULONG aflags = args[1].Int(DEBUG_ATTACH_INVASIVE_RESUME_PROCESS);
         g_hresult = g_client->AttachProcess(0, p.Int(), aflags);
     } else if (p.isstr()) {
-        ULONG cflags = args[1].Int(DEBUG_CREATE_PROCESS_NO_DEBUG_HEAP | DEBUG_PROCESS);
+        ULONG cflags = args[1].Int(default_create_flags);
         ULONG aflags = args[2].Int(DEBUG_ATTACH_INVASIVE_RESUME_PROCESS);
         g_hresult = g_client->CreateProcessAndAttach(0, (char *)(const char *)p, cflags, 0, aflags);
     }
