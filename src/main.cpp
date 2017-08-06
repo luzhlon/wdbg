@@ -38,20 +38,59 @@ void aux_thread() {
     g_ass->run();
 }
 
+// command options
 static bool f_deamon = true;
+unsigned short f_port = 5100;
 
-static void parse_args(int argc, char **argv) {
-    // ...
+static void print_version() {
+    static int major_ver = 0;
+    static int minor_ver = 1;
+    printf(
+        "wdbg v%d.%d, A debugger for windows based Microsoft's dbgeng\n",
+        major_ver, minor_ver);
+}
+
+static void print_help() {
+    printf(
+        "Usage: wdbg [-D] [-p PORT] [-v]\n\n"
+        "Options:\n"
+        "    -D               non daemon mode\n"
+        "    -p PORT          the port to listen, default 5100\n"
+        "    -v               show the version\n"
+        "    -h               show help\n"
+    );
+}
+// if value <= 0, exit
+static int parse_args(int argc, char **argv) {
+    for (size_t i = 1; i < argc; i++) {
+        char *p = argv[i];
+        if (!strcmp(p, "-h"))
+            return print_help(), 0;
+        else if (!strcmp(p, "-D"))
+            f_deamon = false;
+        else if (!strcmp(p, "-v"))
+            return print_version(), 0;
+        else if (!strcmp(p, "-p")) {
+            if (++i >= argc)
+                return printf("no port specified\n"), -1;
+            f_port = atoi(argv[i]);
+            if (!f_port)
+                return printf("error port\n"), -1;
+        } else
+            return printf("unknown option: %s\n", p), -1;
+    }
+    return 1;
 }
 
 int main(int argc, char **argv) {
-    parse_args(argc, argv);
+    int code = parse_args(argc, argv);
+    if (code <= 0) return code;
     // bind and listen
     tstream::server ser;
-    unsigned short port = 5100;
-    for (; !ser.bind("127.0.0.1", port); ++port);
+    while (!ser.bind("127.0.0.1", f_port))
+        ++f_port;
     ser.listen();
-    printf("[PORT]: %d\n", port);
+    printf("[PORT]: %d\n", f_port);
     // Main session and auxiliary session
     Session mss, ass;
     do {
