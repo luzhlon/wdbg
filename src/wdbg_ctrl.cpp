@@ -45,16 +45,29 @@ static void asm_(Session& rpc, Tuple& args) {
 }
 
 static void disasm(Session& rpc, Tuple& args) {
-    const size_t BUFSIZE = 1024;
-    char buffer[BUFSIZE];
+    char buffer[1024];
     ULONG64 offset = args[0].Int(0);
-    ULONG64 count = args[1].Int(1);
+    ULONG64 count = args[1].Int(0);
     ULONG64 endoffset;
     ULONG dissize;
     ULONG flags = 0;
-    if (offset && g_ctrl->Disassemble(offset, flags, buffer,
-        sizeof(buffer), &dissize, &endoffset) == S_OK) {
-        rpc.retn(String::TRef(buffer, dissize));
+    if (!offset) return rpc.retn(false);
+    if (count) {
+        auto t = Tuple::New(count);
+        endoffset = offset;
+        for (size_t i = 0; i < count; i++) {
+            g_hresult = g_ctrl->Disassemble(endoffset, flags,
+                                buffer, sizeof(buffer), &dissize, &endoffset);
+            if (S_OK == g_hresult)
+                t.tuple().set(i, String::New(buffer, dissize));
+            else
+                break;
+        }
+        rpc.retn(t);
+    } else {
+        g_hresult = g_ctrl->Disassemble(offset, flags, buffer, sizeof(buffer), &dissize, &endoffset);
+        if (S_OK == g_hresult)
+            rpc.retn(String::TRef(buffer, dissize));
     }
 }
 
