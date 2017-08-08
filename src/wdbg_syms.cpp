@@ -17,8 +17,14 @@ static void getoffsetbyname(Session& rpc, Tuple& args) {
 static void symbolpath(Session& rpc, Tuple& args) {
     char buf[4096];
     ULONG size;
-    if (S_OK == g_syms->GetSymbolPath(buf, sizeof(buf), &size))
-        rpc.retn(buf);
+    if (args[0].isstr()) {
+        g_hresult = g_syms->SetSymbolPath(args[0]);
+        rpc.retn((uint64_t)g_hresult);
+    } else {
+        g_hresult == g_syms->GetSymbolPath(buf, sizeof(buf), &size);
+        if (S_OK == g_hresult)
+            rpc.retn(buf);
+    }
 }
 // Get numbers of module
 static void modnum(Session& rpc, Tuple& args) {
@@ -40,7 +46,7 @@ static void getmod(Session& rpc, Tuple& args) {
     }
 }
 // Get module by offset
-static void modbyptr(Session& rpc, Tuple& args) {
+static void ptr2mod(Session& rpc, Tuple& args) {
     ULONG64 base; ULONG index;
     g_syms->GetModuleByOffset(args[0].Int(), args[0].Int(0), &index, &base);
     rpc.retn({ base, (uint64_t)index });
@@ -99,7 +105,7 @@ FuncItem debug_syms_funcs[] = {
     {"symbolpath", symbolpath},
     {"modnum", modnum},
     {"getmod", getmod},
-    {"modbyptr", modbyptr},
+    {"ptr2mod", ptr2mod},
     {"typeid", typeid_},
     {"symboltype", symboltype},
     {"fieldoffset", fieldoffset},

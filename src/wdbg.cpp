@@ -10,6 +10,7 @@ extern FuncItem debug_spaces_funcs[];
 extern FuncItem debug_regs_funcs[];
 extern FuncItem debug_syms_funcs[];
 extern FuncItem debug_sysobj_funcs[];
+extern FuncItem wdbg_ext_funcs[];
 
 int load_plugin(const char *path) {
     HMODULE mod = LoadLibrary(path);
@@ -32,8 +33,9 @@ namespace wdbg {
         assert(g_hresult == S_OK);
         g_hresult = g_client->QueryInterface(__uuidof(DbgSyms), (void **)&g_syms);
         assert(g_hresult == S_OK);
-        g_hresult = g_client->QueryInterface(__uuidof(DbgSyms), (void **)&g_sysobj);
+        g_hresult = g_client->QueryInterface(__uuidof(DbgSysobj), (void **)&g_sysobj);
         assert(g_hresult == S_OK);
+        g_ctrl->SetInterruptTimeout(1);
         // Set callback object's
         g_client->SetInputCallbacks(new InputCallback());
         g_client->SetOutputCallbacks(new OutputCallback());
@@ -58,6 +60,7 @@ namespace wdbg {
         load_functions(debug_regs_funcs);
         load_functions(debug_syms_funcs);
         load_functions(debug_sysobj_funcs);
+        load_functions(wdbg_ext_funcs);
         FuncItem items[] = {
             {"loadplug", [](Session& rpc, Tuple& args) {
                 const char *path = args[0];

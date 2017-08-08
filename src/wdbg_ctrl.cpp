@@ -18,8 +18,12 @@ static void addopts(Session& rpc, Tuple& args) {
 
 static void status(Session& rpc, Tuple& args) {
     ULONG status;
-    g_hresult = g_ctrl->GetExecutionStatus(&status);
-    rpc.retn((uint64_t)status);
+    if (args[0].isint())
+        g_hresult = g_ctrl->SetExecutionStatus(args[0].Int()),
+        rpc.retn((uint64_t)g_hresult);
+    else
+        g_hresult = g_ctrl->GetExecutionStatus(&status),
+        rpc.retn((uint64_t)status);
 }
 
 static void prompt(Session& rpc, Tuple& args) {
@@ -111,6 +115,12 @@ static void addbp(Session& rpc, Tuple& args) {
     }
 }
 
+static void rmbp(Session& rpc, Tuple& args) {
+    IDebugBreakpoint2 *bp = (IDebugBreakpoint2 *)args[0].Int(0);
+    g_hresult = g_ctrl->RemoveBreakpoint2(bp);
+    rpc.retn((uint64_t)g_hresult);
+}
+
 static void asmopts(Session& rpc, Tuple& args) {
     auto opt = args[0];
     if (opt.isint()) {
@@ -182,6 +192,7 @@ FuncItem debug_control_funcs[] = {
     // {"asm", asm},
     {"disasm", disasm},
     {"addbp", addbp},
+    {"rmbp", addbp},
     //{"bp_enable", },
     {"asmopts", asmopts},
     {"interrupt", interrupt},

@@ -7,11 +7,30 @@ DbgSysobj *g_sysobj = nullptr;
 using namespace xval;
 using namespace srpc;
 
-static void getpsid(Session& rpc, Tuple& args) {
+static void psid(Session& rpc, Tuple& args) {
     ULONG id;
-    g_hresult = g_sysobj->GetCurrentProcessId(&id);
-    if (S_OK == g_hresult)
-        rpc.retn((uint64_t)id);
+    if (args[0].isint()) {
+        id = args[0].Int();
+        g_hresult = g_sysobj->SetCurrentProcessId(id);
+        rpc.retn((uint64_t)S_OK == g_hresult);
+    } else {
+        g_hresult = g_sysobj->GetCurrentProcessId(&id);
+        if (S_OK == g_hresult)
+            rpc.retn((uint64_t)id);
+    }
+}
+
+static void thid(Session& rpc, Tuple& args) {
+    ULONG id;
+    if (args[0].isint()) {
+        id = args[0].Int();
+        g_hresult = g_sysobj->SetCurrentThreadId(id);
+        rpc.retn((uint64_t)S_OK == g_hresult);
+    } else {
+        g_hresult = g_sysobj->GetCurrentThreadId(&id);
+        if (S_OK == g_hresult)
+            rpc.retn((uint64_t)id);
+    }
 }
 
 static void getpeb(Session& rpc, Tuple& args) {
@@ -37,7 +56,8 @@ static void exename(Session& rpc, Tuple& args) {
 }
 
 FuncItem debug_sysobj_funcs[] = {
-    {"getpsid", getpsid},
+    {"psid", psid},
+    {"thid", thid},
     {"getpeb", getpeb},
     {"getteb", getteb},
     {"exename", exename},

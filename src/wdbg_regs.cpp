@@ -53,7 +53,7 @@ static void setreg(Session& rpc, Tuple& args) {
     GetRegIndexs(args.begin(), &index);
     XValue2DValue(args[1], &dv, args[2].Int(DEBUG_VALUE_INT64));
     g_hresult = g_regs->SetValue(index, &dv);
-    rpc.retn(S_OK == g_hresult);
+    rpc.retn((uint64_t)g_hresult);
 }
 // {value}
 static void getregs(Session& rpc, Tuple& args) {
@@ -67,7 +67,7 @@ static void getregs(Session& rpc, Tuple& args) {
     rpc.retn(ret);
 }
 
-static void ipos(Session& rpc, Tuple& args) {
+static void iptr(Session& rpc, Tuple& args) {
     ULONG source = args[0].Int(DEBUG_REGSRC_DEBUGGEE);
     ULONG64 offset;
     if (S_OK == g_regs->GetInstructionOffset2(source, &offset))
@@ -75,7 +75,7 @@ static void ipos(Session& rpc, Tuple& args) {
 }
 
 FuncItem debug_regs_funcs[] = {
-    {"ipos", ipos},
+    {"iptr", iptr},
     {"getreg", getreg},
     {"setreg", setreg},
     {"getregs", getregs},

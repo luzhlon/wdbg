@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     while (!ser.bind("127.0.0.1", f_port))
         ++f_port;
     ser.listen();
-    printf("[PORT]: %d\n", f_port);
+    cout << "[PORT]: " << f_port << endl;
     // Main session and auxiliary session
     Session mss, ass;
     do {
@@ -102,8 +102,6 @@ int main(int argc, char **argv) {
         thread t(aux_thread); t.detach();
         mss.onopen = [](Session& s) {
             wdbg::init();
-            g_syms->AppendSymbolPath("cache*; srv*http://msdl.microsoft.com/download/symbols");
-            g_syms->AddSymbolOptions(0x100);
         };
         mss.onclose = [](Session& s, bool exp) {
             if (exp) {

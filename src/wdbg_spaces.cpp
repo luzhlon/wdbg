@@ -58,10 +58,14 @@ static void readptr(Session& rpc, Tuple& args) {
     auto p = (ULONG64 *)alloca(sizeof(ULONG64) * count);
     g_hresult = g_spaces->ReadPointersVirtual(count, offset, p);
     if (S_OK == g_hresult) {
-        auto t = Tuple::New(count);
-        for (size_t i = 0; i < count; i++)
-            t.tuple().set(i, p[i]);
-        rpc.retn(t);
+        if (count > 1) {
+            auto t = Tuple::New(count);
+            for (size_t i = 0; i < count; i++)
+                t.tuple().set(i, p[i]);
+            rpc.retn(t);
+        } else {
+            rpc.retn((uint64_t)*p);
+        }
     }
 }
 
