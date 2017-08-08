@@ -1,11 +1,12 @@
 
 #include <string.h>
 #include "wdbg.h"
-#include "handler.h"
 
-DbgRegs *g_regs;
+DbgRegs *g_regs = nullptr;
 
 using namespace wdbg;
+using namespace xval;
+using namespace srpc;
 
 static bool GetRegIndexs(Value *p, ULONG *o, size_t n = 1) {
     for (size_t i = 0; i < n; i++) {

@@ -1,6 +1,5 @@
 
 #include "wdbg.h"
-#include "handler.h"
 
 #include <Windows.h>
 #include <iostream>
@@ -10,7 +9,8 @@ using namespace std;
 using namespace srpc;
 
 // Main session and auxiliary session
-Session *g_ss = nullptr, *g_ass = nullptr;
+Session *g_ss = nullptr;
+Session *g_ass = nullptr;
 // HeartBeat number
 uint64_t last_num = 0;
 // Auxiliary thread, used to interrupt the WaitForEvent
@@ -100,7 +100,11 @@ int main(int argc, char **argv) {
         g_ss = &mss; g_ass = &ass;
         // Startup the auxiliary thread
         thread t(aux_thread); t.detach();
-        mss.onopen = [](Session& s) { wdbg::init(); };
+        mss.onopen = [](Session& s) {
+            wdbg::init();
+            g_syms->AppendSymbolPath("cache*; srv*http://msdl.microsoft.com/download/symbols");
+            g_syms->AddSymbolOptions(0x100);
+        };
         mss.onclose = [](Session& s, bool exp) {
             if (exp) {
                 g_client->TerminateProcesses();

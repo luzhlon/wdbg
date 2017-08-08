@@ -1,10 +1,12 @@
 
 #include "wdbg.h"
-#include "handler.h"
 
 #include <xval_str.h>
 
-DbgControl *g_ctrl;
+DbgControl *g_ctrl = nullptr;
+
+using namespace xval;
+using namespace srpc;
 
 static void addopts(Session& rpc, Tuple& args) {
     auto opts = args[0];
@@ -20,7 +22,7 @@ static void status(Session& rpc, Tuple& args) {
     rpc.retn((uint64_t)status);
 }
 
-static void GetPromptText(Session& rpc, Tuple& args) {
+static void prompt(Session& rpc, Tuple& args) {
     char buf[1024];
     ULONG len;
     g_hresult = g_ctrl->GetPromptText(buf, sizeof(buf), &len);
@@ -76,14 +78,6 @@ static void waitevent(Session& rpc, Tuple& args) {
     rpc.retn((int64_t)g_hresult);
 }
 
-static void asmopts(Session& rpc, Tuple& args) {
-    auto opt = args[0];
-    if (opt.isint()) {
-        g_hresult = g_ctrl->SetAssemblyOptions(opt.Int());
-        rpc.retn(g_hresult == S_OK);
-    }
-}
-
 auto type_s = "type"_x;
 auto id_s = "id"_x;
 auto enable_s = "enable"_x;
@@ -109,12 +103,15 @@ static void addbp(Session& rpc, Tuple& args) {
         if (enable) bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
         if (cmd) bp->SetCommand(cmd);
         if (thread) bp->SetMatchThreadId(thread);
-        // ...
+        if (type == DEBUG_BREAKPOINT_DATA) {
+            bp->SetDataParameters(opts["access_size"_x].Int(1),
+                opts["access_type"_x].Int(DEBUG_BREAK_READ));
+        }
         rpc.retn((int64_t)bp);
     }
 }
 
-static void AssembleOptions(Session& rpc, Tuple& args) {
+static void asmopts(Session& rpc, Tuple& args) {
     auto opt = args[0];
     if (opt.isint()) {
         g_hresult = g_ctrl->SetAssemblyOptions((uint64_t)opt);
@@ -174,13 +171,18 @@ static void eval(Session& rpc, Tuple& args) {
     }
 }
 
+static void is64(Session& rpc, Tuple& args) {
+    rpc.retn(g_ctrl->IsPointer64Bit() == S_OK);
+}
+
 FuncItem debug_control_funcs[] = {
     {"addopts", addopts},
     {"status", status},
-    // {"GetPromptText", GetPromptText},
+    {"prompt", prompt},
     // {"asm", asm},
     {"disasm", disasm},
     {"addbp", addbp},
+    //{"bp_enable", },
     {"asmopts", asmopts},
     {"interrupt", interrupt},
     {"stepinto", stepinto},
@@ -189,5 +191,6 @@ FuncItem debug_control_funcs[] = {
     {"exec", exec},
     {"eval", eval},
     {"waitevent", waitevent},
+    {"is64", is64},
     {nullptr, nullptr}
 };

@@ -1,11 +1,13 @@
 
 #include "wdbg.h"
-#include "handler.h"
 #include "callback.h"
 
 DbgClient *g_client = nullptr;
 
 static ULONG default_create_flags = CREATE_NEW_CONSOLE | DEBUG_CREATE_PROCESS_NO_DEBUG_HEAP | DEBUG_PROCESS;
+
+using namespace srpc;
+using namespace xval;
 
 static void create(Session& rpc, Tuple& args) {
     auto path = args[0];

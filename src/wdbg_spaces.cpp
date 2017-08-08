@@ -2,9 +2,11 @@
 #include "xval_str.h"
 
 #include "wdbg.h"
-#include "handler.h"
 
-DbgSpaces *g_spaces;
+DbgSpaces *g_spaces = nullptr;
+
+using namespace xval;
+using namespace srpc;
 
 static void read(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
@@ -50,7 +52,7 @@ static void readustr(Session& rpc, Tuple& args) {
     rpc.retn(len ? String::New(buf, strlen(buf), true) : Value());
 }
 
-static void readpoi(Session& rpc, Tuple& args) {
+static void readptr(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
     ULONG count = args[1].Int(1);
     auto p = (ULONG64 *)alloca(sizeof(ULONG64) * count);
@@ -63,21 +65,22 @@ static void readpoi(Session& rpc, Tuple& args) {
     }
 }
 
-static void WritePointersVirtual(Session& rpc, Tuple& args) {
-}
-
-static void SearchVirtual(Session& rpc, Tuple& args) {
-    ULONG64  Offset = 0;
-    ULONG64  Length = 0;
+static void search(Session& rpc, Tuple& args) {
+    ULONG64  Offset = args[0].Int(0);
+    ULONG64  Length = args[1].Int(0);
     ULONG    Flags = 0;
-    PVOID    Pattern = 0;
+    PVOID    Pattern =  nullptr;
     ULONG    PatternSize = 0;
     ULONG    PatternGranularity = 1;
 
-    ULONG64 MatchOffset;
-    if (g_spaces->SearchVirtual2(Offset, Length, Flags, Pattern,
-                PatternSize, PatternGranularity, &MatchOffset) == S_OK)
-        rpc.retn(MatchOffset);
+    if (args[2].isstr()) {
+        ULONG64 MatchOffset;
+        Pattern = (PVOID)args[2].str().c_str();
+        PatternSize = args[2].str().size();
+        if (g_spaces->SearchVirtual2(Offset, Length, Flags, Pattern,
+                    PatternSize, PatternGranularity, &MatchOffset) == S_OK)
+            rpc.retn(MatchOffset);
+    }
 }
 
 FuncItem debug_spaces_funcs[] = {
@@ -85,7 +88,7 @@ FuncItem debug_spaces_funcs[] = {
     {"write", write},
     {"readstr", readstr},
     {"readustr", readustr},
-    {"readpoi", readpoi},
-    // {"SearchVirtual", SearchVirtual},
+    {"readptr", readptr},
+    {"search", search},
     {nullptr, nullptr}
 };

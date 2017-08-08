@@ -3,7 +3,18 @@
 #include "callback.h"
 
 HRESULT g_hresult;
-extern void load_functions();
+
+extern FuncItem debug_control_funcs[];
+extern FuncItem debug_client_funcs[];
+extern FuncItem debug_spaces_funcs[];
+extern FuncItem debug_regs_funcs[];
+extern FuncItem debug_syms_funcs[];
+extern FuncItem debug_sysobj_funcs[];
+
+int load_plugin(const char *path) {
+    HMODULE mod = LoadLibrary(path);
+    return mod != NULL;
+}
 
 namespace wdbg {
     using namespace xval;
@@ -41,7 +52,19 @@ namespace wdbg {
             DEBUG_EVENT_CHANGE_ENGINE_STATE |
             DEBUG_EVENT_CHANGE_SYMBOL_STATE));
         // Register the RPC functions
-        load_functions();
+        load_functions(debug_control_funcs);
+        load_functions(debug_client_funcs);
+        load_functions(debug_spaces_funcs);
+        load_functions(debug_regs_funcs);
+        load_functions(debug_syms_funcs);
+        load_functions(debug_sysobj_funcs);
+        FuncItem items[] = {
+            {"loadplug", [](Session& rpc, Tuple& args) {
+                const char *path = args[0];
+                if (path)
+                    rpc.retn((uint64_t)load_plugin(path));
+            }}, {nullptr, nullptr}};
+        load_functions(items);
     }
 
     void DValue2XValue(DEBUG_VALUE *p, Value *o, size_t n) {
@@ -68,5 +91,12 @@ namespace wdbg {
         Value v;
         DValue2XValue(&p, &v);
         return v;
+    }
+
+    int load_functions(FuncItem* items) {
+        int i = 0;
+        for (; items[i].name; i++)
+            g_ss->addfunc(items[i].name, items[i].function);
+        return i;
     }
 }
