@@ -52,8 +52,6 @@ public:
 namespace wdbg {
     class EventCallback : public IDebugEventCallbacks {
     public:
-        EventCallback(ULONG mask) { _mask = mask; }
-
         virtual ULONG _stdcall AddRef() { return 0; }
         virtual ULONG _stdcall Release() { return 1; }
         virtual HRESULT _stdcall QueryInterface(REFIID id, void **ppvObj) {
@@ -99,8 +97,6 @@ namespace wdbg {
             IN ULONG64  InitialThreadHandle,
             IN ULONG64  ThreadDataOffset,
             IN ULONG64  StartOffset);
-
-        ULONG _mask;
     };
 }
 

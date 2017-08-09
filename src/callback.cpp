@@ -55,7 +55,21 @@ HRESULT OutputCallback::Output(IN ULONG Mask, IN PCSTR Text) {
 
 namespace wdbg {
     HRESULT EventCallback::GetInterestMask(PULONG Mask) {
-        *Mask = _mask; return S_OK;
+        *Mask = 
+            DEBUG_EVENT_BREAKPOINT |
+            DEBUG_EVENT_LOAD_MODULE |
+            DEBUG_EVENT_EXCEPTION |
+            DEBUG_EVENT_CREATE_THREAD |
+            DEBUG_EVENT_EXIT_THREAD |
+            DEBUG_EVENT_CREATE_PROCESS |
+            DEBUG_EVENT_EXIT_PROCESS |
+            DEBUG_EVENT_UNLOAD_MODULE |
+            DEBUG_EVENT_SYSTEM_ERROR |
+            DEBUG_EVENT_SESSION_STATUS |
+            DEBUG_EVENT_CHANGE_DEBUGGEE_STATE |
+            DEBUG_EVENT_CHANGE_ENGINE_STATE |
+            DEBUG_EVENT_CHANGE_SYMBOL_STATE;
+        return S_OK;
     }
 
     bool EventCallback::RegisterEvent(ULONG event, const Value& fid) {
@@ -105,7 +119,7 @@ namespace wdbg {
     HRESULT EventCallback::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance) {
         auto h = ev.tuple()[EXCEPTION];
         if (h.isnil())
-            return DEBUG_STATUS_BREAK;
+            return DEBUG_STATUS_GO_NOT_HANDLED;
         return g_ss->call(h, {
             Exception->ExceptionAddress,
             (uint64_t)Exception->ExceptionCode,
@@ -113,7 +127,7 @@ namespace wdbg {
             Exception->ExceptionInformation,
             Exception->ExceptionRecord,
             (bool)FirstChance
-        }).Int(DEBUG_STATUS_BREAK);
+        }).Int(DEBUG_STATUS_GO_NOT_HANDLED);
     }
 
     HRESULT EventCallback::UnloadModule(PCSTR ImageBaseName, ULONG64 BaseOffset) {

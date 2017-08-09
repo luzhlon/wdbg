@@ -50,7 +50,19 @@ static void peinfo(Session& rpc, Tuple& args) {
     }
 }
 
+static void loadplug(Session& rpc, Tuple& args) {
+    const char *path = args[0];
+    if (path) {
+        HMODULE mod = LoadLibrary(path);
+        rpc.retn(mod != NULL);
+    }
+}
+
 FuncItem wdbg_ext_funcs[] = {
     {"peinfo", peinfo},
+    {"loadplug", loadplug},
+    {"echo", [](Session& rpc, Tuple& args) {
+        rpc.retn(&args);
+    }},
     {nullptr, nullptr},
 };

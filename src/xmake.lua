@@ -32,6 +32,7 @@ target("wdbg")
         os.cp('$(buildir)/srpc.lib', 'dist/lib/$(arch)')
         os.cp('$(buildir)/wdbg.lib', 'dist/lib/$(arch)')
         os.cp('$(projectdir)/pywdbg', 'dist')
+        os.cp('$(projectdir)/examples', 'dist')
     end)
 
     add_deps 'srpc'

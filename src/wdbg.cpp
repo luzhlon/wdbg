@@ -12,11 +12,6 @@ extern FuncItem debug_syms_funcs[];
 extern FuncItem debug_sysobj_funcs[];
 extern FuncItem wdbg_ext_funcs[];
 
-int load_plugin(const char *path) {
-    HMODULE mod = LoadLibrary(path);
-    return mod != NULL;
-}
-
 namespace wdbg {
     using namespace xval;
 
@@ -37,22 +32,9 @@ namespace wdbg {
         assert(g_hresult == S_OK);
         g_ctrl->SetInterruptTimeout(1);
         // Set callback object's
-        g_client->SetInputCallbacks(new InputCallback());
-        g_client->SetOutputCallbacks(new OutputCallback());
-        g_client->SetEventCallbacks(new EventCallback(
-            DEBUG_EVENT_BREAKPOINT |
-            DEBUG_EVENT_LOAD_MODULE |
-            DEBUG_EVENT_EXCEPTION |
-            DEBUG_EVENT_CREATE_THREAD |
-            DEBUG_EVENT_EXIT_THREAD |
-            DEBUG_EVENT_CREATE_PROCESS |
-            DEBUG_EVENT_EXIT_PROCESS |
-            DEBUG_EVENT_UNLOAD_MODULE |
-            DEBUG_EVENT_SYSTEM_ERROR |
-            DEBUG_EVENT_SESSION_STATUS |
-            DEBUG_EVENT_CHANGE_DEBUGGEE_STATE |
-            DEBUG_EVENT_CHANGE_ENGINE_STATE |
-            DEBUG_EVENT_CHANGE_SYMBOL_STATE));
+        g_client->SetInputCallbacks(new InputCallback);
+        g_client->SetOutputCallbacks(new OutputCallback);
+        g_client->SetEventCallbacks(new EventCallback);
         // Register the RPC functions
         load_functions(debug_control_funcs);
         load_functions(debug_client_funcs);
@@ -61,13 +43,6 @@ namespace wdbg {
         load_functions(debug_syms_funcs);
         load_functions(debug_sysobj_funcs);
         load_functions(wdbg_ext_funcs);
-        FuncItem items[] = {
-            {"loadplug", [](Session& rpc, Tuple& args) {
-                const char *path = args[0];
-                if (path)
-                    rpc.retn((uint64_t)load_plugin(path));
-            }}, {nullptr, nullptr}};
-        load_functions(items);
     }
 
     void DValue2XValue(DEBUG_VALUE *p, Value *o, size_t n) {

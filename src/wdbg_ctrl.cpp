@@ -79,7 +79,7 @@ static void disasm(Session& rpc, Tuple& args) {
 
 static void waitevent(Session& rpc, Tuple& args) {
     g_hresult = g_ctrl->WaitForEvent(0, args[0].Int(INFINITE));
-    rpc.retn((int64_t)g_hresult);
+    rpc.retn((uint64_t)g_hresult);
 }
 
 auto type_s = "type"_x;
@@ -111,7 +111,7 @@ static void addbp(Session& rpc, Tuple& args) {
             bp->SetDataParameters(opts["access_size"_x].Int(1),
                 opts["access_type"_x].Int(DEBUG_BREAK_READ));
         }
-        rpc.retn((int64_t)bp);
+        rpc.retn((uint64_t)bp);
     }
 }
 
@@ -161,12 +161,6 @@ static void exec(Session& rpc, Tuple& args) {
     ULONG flags = args[1].Int(DEBUG_EXECUTE_ECHO);
     if (cmd) {
         g_hresult = g_ctrl->Execute(DEBUG_OUTCTL_THIS_CLIENT, cmd, flags);
-        if (g_hresult == S_OK) {
-            ULONG status;
-            g_hresult = g_ctrl->GetExecutionStatus(&status);
-            if (status != DEBUG_STATUS_BREAK)
-                g_ctrl->WaitForEvent(0, INFINITE);
-        }
         rpc.retn((uint64_t)g_hresult);
     }
 }
@@ -185,10 +179,16 @@ static void is64(Session& rpc, Tuple& args) {
     rpc.retn(g_ctrl->IsPointer64Bit() == S_OK);
 }
 
+static void putstate(Session& rpc, Tuple& args) {
+    g_hresult = g_ctrl->OutputCurrentState(DEBUG_OUTCTL_THIS_CLIENT, DEBUG_CURRENT_DEFAULT);
+    rpc.retn((uint64_t)g_hresult);
+}
+
 FuncItem debug_control_funcs[] = {
     {"addopts", addopts},
     {"status", status},
     {"prompt", prompt},
+    {"putstate", putstate},
     // {"asm", asm},
     {"disasm", disasm},
     {"addbp", addbp},
@@ -196,9 +196,6 @@ FuncItem debug_control_funcs[] = {
     //{"bp_enable", },
     {"asmopts", asmopts},
     {"interrupt", interrupt},
-    {"stepinto", stepinto},
-    {"stepover", stepover},
-    {"run", run},
     {"exec", exec},
     {"eval", eval},
     {"waitevent", waitevent},

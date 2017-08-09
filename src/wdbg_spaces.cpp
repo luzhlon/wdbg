@@ -39,7 +39,11 @@ static void readstr(Session& rpc, Tuple& args) {
     ULONG len;
     char buf[10240];
     g_hresult = g_spaces->ReadMultiByteStringVirtual(offset, sizeof(buf), buf, sizeof(buf), &len);
-    rpc.retn(S_OK == g_hresult ? String::New(buf, len, true) : Value());
+    if (S_OK == g_hresult) {
+        Value s = String::TRef(buf, len);
+        s.str().isbin(true);
+        rpc.retn(s);
+    }
 }
 
 static void readustr(Session& rpc, Tuple& args) {
