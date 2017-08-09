@@ -1,7 +1,7 @@
 
 import time, os
-import srpc
-from K import ERROR, ENGOPT, EVENT, STATUS
+from . import srpc
+from .K import ERROR, ENGOPT, EVENT, STATUS
 from threading import Thread, Event
 
 # Auxiliary session's handler
@@ -19,7 +19,7 @@ class MainHandler:
     def output(ss, data):
         print(data.decode('gbk'), end = '')
 
-backfset = set(['stepinto', 'stepover', 'run', 'waitevent', 'exec'])
+backfset = set(['waitevent'])
 
 class WDbg:
     def __init__(self):
@@ -70,15 +70,31 @@ class WDbg:
             self.setoutput('output')
 
     def interrupt(self):
-        return self._ass.notify('interrupt')
+        self._ass.notify('interrupt')
+        return self
+
+    def stepinto(self):
+        self.status(STATUS.STEP_INTO)
+        return self
+
+    def stepover(self):
+        self.status(STATUS.STEP_OVER)
+        return self
+
+    def go(self):
+        self.status(STATUS.GO)
+        return self
 
     def cmdloop(self):
         while True:
             try:
-                cmd = input('> ')
+                cmd = input(self.prompt() + ' > ')
                 b = self.exec(cmd)
                 if b:
                     print('[Execute failure]', cmd)
+                if self.status() != STATUS.BREAK:
+                    self.waitevent()
+                    self.putstate()
             except EOFError:
                 break
             except KeyboardInterrupt:
@@ -150,6 +166,7 @@ def connect(addr = None, port = None):
         _wdbg._ass.connect(addr, port)
         Thread(target = _wdbg._ass.run).start()
 
+        _wdbg.init()
         return _wdbg
 
 def startup(arch = 'x86'):

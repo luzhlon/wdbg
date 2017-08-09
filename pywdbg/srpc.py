@@ -1,6 +1,6 @@
 
 import umsgpack as msgpack
-from tstream import TcpStream
+from .tstream import TcpStream
 from threading import RLock
 
 MSG_INVALID = 0
