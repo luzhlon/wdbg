@@ -86,11 +86,12 @@ namespace wdbg {
     HRESULT EventCallback::Breakpoint(IDebugBreakpoint *bp) {
         // ??? return NOT_HANDLED will cause exception
         auto h = ev.tuple()[BREAKPOINT];
-        if (h.isnil()) return DEBUG_STATUS_GO_NOT_HANDLED;
+        if (h.isnil())
+            return DEBUG_STATUS_BREAK;
         ULONG64 offset; bp->GetOffset(&offset);
         return g_ss->call(h, {
             (uint64_t)bp, offset
-        }).Int(DEBUG_STATUS_GO_NOT_HANDLED);
+        }).Int(DEBUG_STATUS_BREAK);
     }
 
     HRESULT EventCallback::ChangeDebuggeeState(ULONG Flags, ULONG64 Argument) {
@@ -103,7 +104,8 @@ namespace wdbg {
 
     HRESULT EventCallback::Exception(PEXCEPTION_RECORD64 Exception, ULONG FirstChance) {
         auto h = ev.tuple()[EXCEPTION];
-        if (h.isnil()) return DEBUG_STATUS_GO_NOT_HANDLED;
+        if (h.isnil())
+            return DEBUG_STATUS_BREAK;
         return g_ss->call(h, {
             Exception->ExceptionAddress,
             (uint64_t)Exception->ExceptionCode,
@@ -111,7 +113,7 @@ namespace wdbg {
             Exception->ExceptionInformation,
             Exception->ExceptionRecord,
             (bool)FirstChance
-        }).Int(DEBUG_STATUS_GO_NOT_HANDLED);
+        }).Int(DEBUG_STATUS_BREAK);
     }
 
     HRESULT EventCallback::UnloadModule(PCSTR ImageBaseName, ULONG64 BaseOffset) {
@@ -140,11 +142,12 @@ namespace wdbg {
 
     HRESULT EventCallback::SystemError(ULONG Error, ULONG Level) {
         auto h = ev.tuple()[SYSTEMERROR];
-        if (h.isnil()) return DEBUG_STATUS_GO_NOT_HANDLED;
+        if (h.isnil())
+            return DEBUG_STATUS_BREAK;
         return g_ss->call(h, {
             (uint64_t)Error,
             (uint64_t)Level
-        }).Int(DEBUG_STATUS_GO_NOT_HANDLED);
+        }).Int(DEBUG_STATUS_BREAK);
     }
 
     HRESULT EventCallback::CreateThread(

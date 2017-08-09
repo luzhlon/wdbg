@@ -14,9 +14,6 @@ ERR_NO_FUNC = 0
 class Handler:
     pass
 
-class NotFindFunction(Exception):
-    pass
-
 class Session:
     def __init__(self, io):
         self._io = io
@@ -38,6 +35,7 @@ class Session:
         self._pack = [t, fid, *args]
         b = self._send_pack()
         self._mutex.release()
+        self._lastfid = fid
         return b
 
     def _return(self, v):
@@ -91,7 +89,7 @@ class Session:
                 pack = self._pack
                 return pack[1:] if len(pack) > 2 else pack[1]
             elif self._type() == MSG_EXCEPT:
-                raise NotFindFunction('No function:')
+                raise Exception('No such function: ' + self._lastfid)
             else:
                 self._handle_invoke()   # handle invoke
 

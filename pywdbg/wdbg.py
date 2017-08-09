@@ -4,9 +4,6 @@ import srpc
 from K import ERROR, ENGOPT, EVENT, STATUS
 from threading import Thread, Event
 
-# Breakpoint callbacks
-bp_callback = {}
-
 # Auxiliary session's handler
 class AuxHandler:
     def heartbeat(ss, n):
@@ -21,18 +18,6 @@ class MainHandler:
 
     def output(ss, data):
         print(data.decode('gbk'), end = '')
-
-    def breakpoint(ss, id, offset):
-        global bp_callback
-        # print('[Breakpoint]\t%x occured, offset: %x' % (id, offset))
-        ret = None
-        if id in bp_callback:
-            ret = bp_callback[id](id, offset)
-        if ret is int:
-            return ret
-        return STATUS.BREAK
-
-on = MainHandler
 
 backfset = set(['stepinto', 'stepover', 'run', 'waitevent', 'exec'])
 
@@ -83,18 +68,6 @@ class WDbg:
         # output callback
         if getattr(MainHandler, 'output'):
             self.setoutput('output')
-        # register events callbacks
-        def reg(eid, fname):
-            try:
-                getattr(MainHandler, fname)
-                self.setevent(eid, fname)
-            except AttributeError:
-                return
-        reg(EVENT.BREAKPOINT, 'breakpoint')
-        reg(EVENT.CREATE_PROCESS, 'createprocess')
-        reg(EVENT.CREATE_THREAD, 'createthread')
-        reg(EVENT.LOAD_MODULE, 'loadmodule')
-        reg(EVENT.EXIT_PROCESS, 'exitprocess')
 
     def interrupt(self):
         return self._ass.notify('interrupt')
@@ -110,6 +83,18 @@ class WDbg:
                 break
             except KeyboardInterrupt:
                 break
+
+    def event(self, name, func = None):
+        try:
+            if func:
+                origin = self.event(name)
+                code = getattr(EVENT, name)
+                setattr(MainHandler, name, func)
+                self.setevent(code, name)
+            else:
+                return MainHandler.__dict__.get(name)
+        except AttributeError:
+            raise Exception('No such event: ' + name)
 
 PATH = __file__
 
