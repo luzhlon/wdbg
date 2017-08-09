@@ -14,11 +14,12 @@
 
 ![](./demo.gif)
 
-关于pywdbg的使用，你可以看wiki
+关于pywdbg的使用，你可以看[wiki](https://github.com/luzhlon/wdbg/wiki) [pywdbg-wiki](https://github.com/luzhlon/wdbg/wiki/pywdbg)
 
 ## Features
 
-* 支持32位和64位程序调试
+* 支持32位和**64位**程序调试
+* 支持双机**内核调试**
 * 可通过网络远程调试
 
 ## Related project
