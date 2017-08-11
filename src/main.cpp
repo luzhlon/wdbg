@@ -41,6 +41,7 @@ void aux_thread() {
 // command options
 static bool f_deamon = true;
 unsigned short f_port = 5100;
+const char *f_ipaddr = "0.0.0.0";
 
 static void print_version() {
     static int major_ver = 0;
@@ -56,6 +57,7 @@ static void print_help() {
         "Options:\n"
         "    -D               non daemon mode\n"
         "    -p PORT          the port to listen, default 5100\n"
+        "    -a ADDR          the adapter to listen, default 0.0.0.0\n"
         "    -v               show the version\n"
         "    -h               show help\n"
     );
@@ -70,7 +72,11 @@ static int parse_args(int argc, char **argv) {
             f_deamon = false;
         else if (!strcmp(p, "-v"))
             return print_version(), 0;
-        else if (!strcmp(p, "-p")) {
+        else if (!strcmp(p, "-a")) {
+            if (++i >= argc)
+                return printf("no adapter specified\n"), -1;
+            f_ipaddr = argv[i];
+        } else if (!strcmp(p, "-p")) {
             if (++i >= argc)
                 return printf("no port specified\n"), -1;
             f_port = atoi(argv[i]);
@@ -87,7 +93,7 @@ int main(int argc, char **argv) {
     if (code <= 0) return code;
     // bind and listen
     tstream::server ser;
-    while (!ser.bind("127.0.0.1", f_port))
+    while (!ser.bind(f_ipaddr, f_port))
         ++f_port;
     ser.listen();
     cout << "[PORT]: " << f_port << endl;
@@ -105,8 +111,8 @@ int main(int argc, char **argv) {
         };
         mss.onclose = [](Session& s, bool exp) {
             if (exp) {
-                g_client->TerminateProcesses();
-                printf("[EXITED EXCEPTED]: Terminated all processed\n");
+                printf("[EXITED EXCEPTED]: EndSession\n");
+                g_client->EndSession(DEBUG_END_ACTIVE_TERMINATE);
             } else {
                 printf("[EXITED NORMALLY]\n");
             }

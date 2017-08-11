@@ -111,16 +111,42 @@ static void addbp(Session& rpc, Tuple& args) {
             bp->SetDataParameters(opts["access_size"_x].Int(1),
                 opts["access_type"_x].Int(DEBUG_BREAK_READ));
         }
-        rpc.retn((uint64_t)bp);
+        if (S_OK == bp->GetId(&id))
+            rpc.retn((uint64_t)id);
     }
 }
-
+// Remove a breakpoint
 static void rmbp(Session& rpc, Tuple& args) {
-    IDebugBreakpoint2 *bp = (IDebugBreakpoint2 *)args[0].Int(0);
-    g_hresult = g_ctrl->RemoveBreakpoint2(bp);
-    rpc.retn((uint64_t)g_hresult);
+    if (args[0].isint()) {
+        ULONG id = args[0].Int();
+        IDebugBreakpoint2 *bp;
+        g_ctrl->GetBreakpointById2(id, &bp);
+        g_hresult = g_ctrl->RemoveBreakpoint2(bp);
+        rpc.retn((uint64_t)g_hresult);
+    }
 }
-
+// Enable or disable a breakpoint
+static void enablebp(Session& rpc, Tuple& args) {
+    if (args[0].isint()) {
+        ULONG id = args[0].Int();
+        IDebugBreakpoint2 *bp;
+        if (S_OK == g_ctrl->GetBreakpointById2(id, &bp)) {
+            if (args[1].Bool(true))
+                g_hresult = bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
+            else
+                g_hresult = bp->RemoveFlags(DEBUG_BREAKPOINT_ENABLED);
+            rpc.retn((uint64_t)g_hresult);
+        }
+    }
+}
+// Get the position of instruction 'ret' in this function
+static void retpos(Session& rpc, Tuple& args) {
+    ULONG64 offset;
+    g_hresult = g_ctrl->GetReturnOffset(&offset);
+    if (S_OK == g_hresult)
+        rpc.retn(offset);
+}
+// Get or set the assemble(disassemble) options
 static void asmopts(Session& rpc, Tuple& args) {
     auto opt = args[0];
     if (opt.isint()) {
@@ -132,30 +158,7 @@ static void asmopts(Session& rpc, Tuple& args) {
         rpc.retn(g_hresult == S_OK ? (uint64_t)options : false);
     }
 }
-
-static HRESULT SetStatusAndRun(ULONG status) {
-    g_hresult = g_ctrl->SetExecutionStatus(status);
-    if (S_OK == g_hresult)
-        g_hresult = g_ctrl->WaitForEvent(0, INFINITE);
-    return g_hresult;
-}
-
-static void stepinto(Session& rpc, Tuple& args) {
-    ULONG count = args[0].Int(1);
-    while (count--)
-        rpc.retn((uint64_t)SetStatusAndRun(DEBUG_STATUS_STEP_INTO));
-}
-
-static void stepover(Session& rpc, Tuple& args) {
-    ULONG count = args[0].Int(1);
-    while (count--)
-        rpc.retn((uint64_t)SetStatusAndRun(DEBUG_STATUS_STEP_OVER));
-}
-
-static void run(Session& rpc, Tuple& args) {
-    rpc.retn((uint64_t)SetStatusAndRun(DEBUG_STATUS_GO));
-}
-
+// Execute a command(windbg)
 static void exec(Session& rpc, Tuple& args) {
     PCSTR cmd = args[0];
     ULONG flags = args[1].Int(DEBUG_EXECUTE_ECHO);
@@ -164,14 +167,15 @@ static void exec(Session& rpc, Tuple& args) {
         rpc.retn((uint64_t)g_hresult);
     }
 }
-
+// Evaluate a expression
 static void eval(Session& rpc, Tuple& args) {
     auto expr = args[0];
     ULONG desiredType = args[1].Int(DEBUG_VALUE_INVALID);
     DEBUG_VALUE dv;
     if (expr.isstr()) {
         g_hresult = g_ctrl->Evaluate(expr, desiredType, &dv, nullptr);
-        rpc.retn(S_OK == g_hresult ? wdbg::DValue2XValue(dv) : false);
+        if (S_OK == g_hresult)
+            rpc.retn(wdbg::DValue2XValue(dv));
     }
 }
 
@@ -184,6 +188,21 @@ static void putstate(Session& rpc, Tuple& args) {
     rpc.retn((uint64_t)g_hresult);
 }
 
+static void addext(Session& rpc, Tuple& args) {
+    ULONG64 handle;
+    g_hresult = g_ctrl->AddExtension(args[0], 0, &handle);
+    if (S_OK == g_hresult)
+        rpc.retn(handle);
+}
+
+static void callext(Session& rpc, Tuple& args) {
+    ULONG64 handle = args[0].Int(0);
+    if (handle) {
+        g_hresult = g_ctrl->CallExtension(handle, args[1], args[2]);
+        rpc.retn((uint64_t)g_hresult);
+    }
+}
+
 FuncItem debug_control_funcs[] = {
     {"addopts", addopts},
     {"status", status},
@@ -193,12 +212,15 @@ FuncItem debug_control_funcs[] = {
     {"disasm", disasm},
     {"addbp", addbp},
     {"rmbp", addbp},
-    //{"bp_enable", },
+    {"enablebp", enablebp},
+    {"retpos", retpos},
     {"asmopts", asmopts},
     {"interrupt", interrupt},
     {"exec", exec},
     {"eval", eval},
     {"waitevent", waitevent},
     {"is64", is64},
+    {"addext", addext},
+    {"callext", callext},
     {nullptr, nullptr}
 };

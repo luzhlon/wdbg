@@ -1,4 +1,5 @@
 
+#include <string>
 #include "wdbg.h"
 #include "callback.h"
 
@@ -11,6 +12,13 @@ extern FuncItem debug_regs_funcs[];
 extern FuncItem debug_syms_funcs[];
 extern FuncItem debug_sysobj_funcs[];
 extern FuncItem wdbg_ext_funcs[];
+
+void setextpath() {
+    extern string wdbgdir();
+    auto dir = wdbgdir();
+    string t = dir + "\\winext;" + dir + "\\winxp;";
+    SetEnvironmentVariable("_NT_DEBUGGER_EXTENSION_PATH", t.c_str());
+}
 
 namespace wdbg {
     using namespace xval;
@@ -30,7 +38,10 @@ namespace wdbg {
         assert(g_hresult == S_OK);
         g_hresult = g_client->QueryInterface(__uuidof(DbgSysobj), (void **)&g_sysobj);
         assert(g_hresult == S_OK);
+        g_ctrl->AddEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK | DEBUG_ENGOPT_FINAL_BREAK);
         g_ctrl->SetInterruptTimeout(1);
+        // Set PATH
+        setextpath();
         // Set callback object's
         g_client->SetInputCallbacks(new InputCallback);
         g_client->SetOutputCallbacks(new OutputCallback);

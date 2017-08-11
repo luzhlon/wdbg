@@ -12,13 +12,6 @@ Value Machine = "Machine"_x;
 Value Subsystem = "Subsystem"_x;
 Value ImageSize = "ImageSize"_x;
 
-static void readntheader(ULONG64 mod, PIMAGE_NT_HEADERS pnt) {
-    ULONG64 base = mod;
-    DWORD peoffset = 0;
-    g_spaces->ReadVirtual(base + offsetof(IMAGE_DOS_HEADER, e_lfanew),
-        &peoffset, sizeof(peoffset), nullptr);
-    g_spaces->ReadVirtual(base + peoffset, pnt, sizeof(IMAGE_NT_HEADERS), nullptr);
-}
 // ([module], attribute...)
 static void peinfo(Session& rpc, Tuple& args) {
     ULONG64 base = 0;
@@ -29,8 +22,8 @@ static void peinfo(Session& rpc, Tuple& args) {
     else
         g_syms->GetModuleByIndex(0, &base);
 
-    IMAGE_NT_HEADERS ImgNt;
-    readntheader(base, &ImgNt);
+    IMAGE_NT_HEADERS64 ImgNt;
+    g_spaces->ReadImageNtHeaders(base, &ImgNt);
 
     if (ImgNt.Signature == IMAGE_NT_SIGNATURE) {        // "PE\0\0"
         auto t_ = Tuple::New(args.size() - index);
@@ -58,8 +51,49 @@ static void loadplug(Session& rpc, Tuple& args) {
     }
 }
 
+string wdbgpath() {
+    char buf[512];
+    auto len = GetModuleFileName(GetModuleHandle(NULL), buf, sizeof(buf));
+    if (len > sizeof(buf)) {
+        string path(len, '\0');
+        GetModuleFileName(GetModuleHandle(NULL), (char *)path.c_str(), path.size());
+    } else {
+        return buf;
+    }
+}
+
+string wdbgdir() {
+    auto path = wdbgpath();
+    auto pos = path.rfind('\\');
+    if (pos == string::npos)
+        return "";
+    path.resize(pos);
+    return path;
+}
+// Get the path of wdbg.exe
+static void wdbgpath(Session& rpc, Tuple& args) {
+    auto path = wdbgpath();
+    rpc.retn(String::TRef(path.c_str(), path.size()));
+}
+// Get the directory of wdbg.exe
+static void wdbgdir(Session& rpc, Tuple& args) {
+    auto dir = wdbgdir();
+    rpc.retn(String::TRef(dir.c_str(), dir.size()));
+}
+// Get or set the environment variable
+static void env(Session& rpc, Tuple& args) {
+    auto e = args[0];
+    if (args[1].isstr())
+        rpc.retn((bool)SetEnvironmentVariable(e, args[1]));
+    else
+        rpc.retn(String::TRef(getenv(e)));
+}
+
 FuncItem wdbg_ext_funcs[] = {
     {"peinfo", peinfo},
+    {"wdbgpath", wdbgpath},
+    {"wdbgdir", wdbgdir},
+    {"env", env},
     {"loadplug", loadplug},
     {"echo", [](Session& rpc, Tuple& args) {
         rpc.retn(&args);

@@ -27,13 +27,13 @@ bool InputCallback::isinputting = false;
 
 HRESULT InputCallback::StartInput(ULONG bufsize) {
     isinputting = true;
-    auto str = g_ss->call("input", (uint64_t)bufsize);
+    auto str = g_ss->call("Input", (uint64_t)bufsize);
     if (str.isstr()) {
         const char *p = str;
         const char *e = p + str.str().size();
         while (isinputting && p < e) {
             ULONG size;
-            g_ctrl->Input((char *)p, e - p, &size);
+            g_ctrl->ReturnInput(p);
             p += size;
         }
     } else

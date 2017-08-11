@@ -73,9 +73,15 @@ static void attachkernel(Session& rpc, Tuple& args) {
         rpc.retn((uint64_t)g_hresult);
     }
 }
+// End the current session
+static void end(Session& rpc, Tuple& args) {
+    g_hresult = g_client->EndSession(args[0].Int(DEBUG_END_ACTIVE_TERMINATE));
+    rpc.retn((uint64_t)g_hresult);
+}
 
 FuncItem debug_client_funcs[] = {
     {"create", create},
+    {"end", end},
     {"setinput", setinput},
     {"setoutput", setoutput},
     {"setevent", setevent},

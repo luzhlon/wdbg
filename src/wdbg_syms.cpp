@@ -6,15 +6,15 @@ DbgSyms *g_syms = nullptr;
 
 using namespace xval;
 using namespace srpc;
-
-static void getoffsetbyname(Session& rpc, Tuple& args) {
+// Get position by a symbol name 
+static void name2pos(Session& rpc, Tuple& args) {
     auto name = args[0];
     ULONG64 offset;
     if (name.isstr() && g_syms->GetOffsetByName(name, &offset) != S_FALSE)
         rpc.retn(offset);
 }
-
-static void symbolpath(Session& rpc, Tuple& args) {
+// Get or set the symbol's path
+static void sympath(Session& rpc, Tuple& args) {
     char buf[4096];
     ULONG size;
     if (args[0].isstr()) {
@@ -46,7 +46,7 @@ static void getmod(Session& rpc, Tuple& args) {
     }
 }
 // Get module by offset
-static void ptr2mod(Session& rpc, Tuple& args) {
+static void pos2mod(Session& rpc, Tuple& args) {
     ULONG64 base; ULONG index;
     g_syms->GetModuleByOffset(args[0].Int(), args[0].Int(0), &index, &base);
     rpc.retn({ base, (uint64_t)index });
@@ -63,8 +63,8 @@ static void typeid_(Session& rpc, Tuple& args) {
     if (S_OK == g_hresult)
         rpc.retn((uint64_t)id);
 }
-//
-static void symboltype(Session& rpc, Tuple& args) {
+// Get the id and it's module by a symbol
+static void symtype(Session& rpc, Tuple& args) {
     ULONG id; ULONG64 mod;
     g_hresult = g_syms->GetSymbolTypeId(args[0], &id, &mod);
     if (S_OK == g_hresult)
@@ -80,8 +80,7 @@ static void typesize(Session& rpc, Tuple& args) {
     g_syms->GetTypeSize(args[1].Int(0), id, &size);
     rpc.retn((uint64_t)size);
 }
-// get symbol type id
-// get field offset
+// Get field offset in a type
 static void fieldoffset(Session& rpc, Tuple& args) {
     // ...
     ULONG64 module = 0;
@@ -92,7 +91,7 @@ static void fieldoffset(Session& rpc, Tuple& args) {
     g_syms->GetFieldOffset(module, id, args[1], &offset);
     rpc.retn((uint64_t)offset);
 }
-
+// Get the field name by it's module, typeid belongs to, index
 static void fieldname(Session& rpc, Tuple& args) {
     char buf[1024];
     ULONG size;
@@ -101,13 +100,14 @@ static void fieldname(Session& rpc, Tuple& args) {
 }
 
 FuncItem debug_syms_funcs[] = {
-    {"getoffsetbyname", getoffsetbyname},
-    {"symbolpath", symbolpath},
+    {"name2pos", name2pos},
+    {"sympath", sympath},
     {"modnum", modnum},
     {"getmod", getmod},
-    {"ptr2mod", ptr2mod},
+    {"pos2mod", pos2mod},
     {"typeid", typeid_},
-    {"symboltype", symboltype},
+    {"symtype", symtype},
     {"fieldoffset", fieldoffset},
+    {"fieldname", fieldname},
     {nullptr, nullptr}
 };
