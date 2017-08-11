@@ -1,7 +1,7 @@
 
 import time, os
 from . import srpc
-from .K import ERROR, ENGOPT, EVENT, STATUS
+from .K import ERROR, ENGOPT, EVENT, STATUS, END
 from threading import Thread, Event
 
 # Auxiliary session's handler
@@ -9,12 +9,10 @@ class AuxHandler:
     def heartbeat(ss, n):
         ss.notify('heartbeat', n)
 
-INPUT = input
 # Main session's handler
 class MainHandler:
-    def input(ss, data):
-        global INPUT
-        return INPUT()
+    def Input(ss, data):
+        return input()
 
     def output(ss, data):
         print(data.decode('gbk'), end = '')
@@ -64,10 +62,19 @@ class WDbg:
         return self._result
 
     def init(self):
-        self.addopts(ENGOPT.INITIAL_BREAK | ENGOPT.FINAL_BREAK)
         # output callback
         if getattr(MainHandler, 'output'):
             self.setoutput('output')
+        # load rc file
+        f = os.path.expanduser('~/_wdbgrc.py')
+        try:
+            with open(f) as rc:
+                exec(rc.read(), {'wdbg': self})
+            print('rc file loaded success!')
+        except OSError:
+            pass
+        except Exception as e:
+            print('Exception raised during load rc file:', e)
 
     def interrupt(self):
         self._ass.notify('interrupt')
@@ -84,6 +91,12 @@ class WDbg:
     def go(self):
         self.status(STATUS.GO)
         return self
+
+    def end_detach(self):
+        return self.end(END.ACTIVE_DETACH)
+
+    def end_term(self):
+        return self.end(END.ACTIVE_TERMINATE)
 
     def cmdloop(self):
         while True:
@@ -128,12 +141,13 @@ def search_wdbg(arch):
         if os.path.exists(p):
             return p
 
-def start_local(arch = 'x86'):
+def start_local(arch = 'x86', path = None):
     '''start the wdbg subprocess, and return its listened port'''
 
-    path = search_wdbg(arch)
     if not path:
-        return None
+        path = search_wdbg(arch)
+        if not path:
+            return None
 
     from subprocess import STARTUPINFO, Popen, SW_HIDE
     from subprocess import CREATE_NEW_CONSOLE, STARTF_USESHOWWINDOW, PIPE
@@ -141,8 +155,9 @@ def start_local(arch = 'x86'):
     si = STARTUPINFO()
     si.dwFlags = STARTF_USESHOWWINDOW
     si.wShowWindow = SW_HIDE
-    wdbg = Popen([path, '-D'], bufsize = 0, startupinfo = si,
-            creationflags = CREATE_NEW_CONSOLE, stdin = PIPE, stdout = PIPE)
+    wdbg = Popen([path, '-D', '-a', '127.0.0.1'],
+                 bufsize = 0, startupinfo = si, stdin = PIPE,
+                 creationflags = CREATE_NEW_CONSOLE, stdout = PIPE)
     import re
     line = wdbg.stdout.readline().decode()
     port = re.search(r'\d+', line)
@@ -169,10 +184,10 @@ def connect(addr = None, port = None):
         _wdbg.init()
         return _wdbg
 
-def startup(arch = 'x86'):
+def startup(arch = 'x86', path = None):
     '''startup the wdbg subprocess and connect it, return the WDbg object'''
 
-    port = start_local(arch)
+    port = start_local(arch, path)
     if port:
         return connect('127.0.0.1', port)
 
