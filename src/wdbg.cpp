@@ -14,6 +14,9 @@ extern FuncItem debug_sysobj_funcs[];
 extern FuncItem wdbg_ext_funcs[];
 
 void setextpath() {
+    extern string wdbgpath();
+    SetEnvironmentVariable("_NT_EXECUTABLE_IMAGE_PATH", wdbgpath().c_str());
+
     extern string wdbgdir();
     auto dir = wdbgdir();
     string t = dir + "\\winext;" + dir + "\\winxp;";

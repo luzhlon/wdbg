@@ -211,7 +211,7 @@ FuncItem debug_control_funcs[] = {
     // {"asm", asm},
     {"disasm", disasm},
     {"addbp", addbp},
-    {"rmbp", addbp},
+    {"rmbp", rmbp},
     {"enablebp", enablebp},
     {"retpos", retpos},
     {"asmopts", asmopts},

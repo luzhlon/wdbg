@@ -102,10 +102,8 @@ namespace wdbg {
         auto h = ev.tuple()[BREAKPOINT];
         if (h.isnil())
             return DEBUG_STATUS_BREAK;
-        ULONG64 offset; bp->GetOffset(&offset);
-        return g_ss->call(h, {
-            (uint64_t)bp, offset
-        }).Int(DEBUG_STATUS_BREAK);
+        ULONG id; bp->GetId(&id);
+        return g_ss->call(h, (uint64_t)id).Int(DEBUG_STATUS_BREAK);
     }
 
     HRESULT EventCallback::ChangeDebuggeeState(ULONG Flags, ULONG64 Argument) {

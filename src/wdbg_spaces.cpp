@@ -1,13 +1,12 @@
 
-#include "xval_str.h"
-
+#include <xval_str.h>
 #include "wdbg.h"
 
 DbgSpaces *g_spaces = nullptr;
 
 using namespace xval;
 using namespace srpc;
-
+// Read the virtual memory
 static void read(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
     if (offset) {
@@ -15,10 +14,14 @@ static void read(Session& rpc, Tuple& args) {
         ULONG bytesread;
         auto buf = (char *)alloca(size);
         g_hresult = g_spaces->ReadVirtual(offset, buf, size, &bytesread);
-        rpc.retn(S_OK == g_hresult ? String::New(buf, bytesread, true) : Value());
+        if (S_OK == g_hresult) {
+            auto data = String::TRef(buf, bytesread);
+            data.str().isbin(true);
+            rpc.retn(data);
+        }
     }
 }
-
+// Write the virtual memory
 static void write(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
     auto data = args[1];
@@ -33,6 +36,32 @@ static void write(Session& rpc, Tuple& args) {
             rpc.retn((uint64_t)byteswritten);
     }
 }
+// Read the physical memory
+static void readphy(Session& rpc, Tuple& args) {
+    auto pos = args[0];
+    if (pos.isint()) {
+        ULONG bytesread;
+        ULONG size = args[1].Int(1);
+        auto buf = (char *)alloca(size);
+        g_hresult = g_spaces->ReadPhysical(pos.Int(), buf, size, &bytesread);
+        if (S_OK == g_hresult) {
+            auto data = String::TRef(buf, bytesread);
+            data.str().isbin(true);
+            rpc.retn(data);
+        }
+    }
+}
+// Write the physical memory
+static void writephy(Session& rpc, Tuple& args) {
+    auto pos = args[0], data = args[1];
+    if (pos.isint() && data.isstr()) {
+        ULONG byteswritten;
+        g_hresult = g_spaces->WritePhysical(
+            pos.Int(), data, data.str().size(), &byteswritten);
+        if (S_OK == g_hresult)
+            rpc.retn((uint64_t)byteswritten);
+    }
+}
 
 static void readstr(Session& rpc, Tuple& args) {
     ULONG64 offset = args[0].Int(0);
@@ -40,9 +69,9 @@ static void readstr(Session& rpc, Tuple& args) {
     char buf[10240];
     g_hresult = g_spaces->ReadMultiByteStringVirtual(offset, sizeof(buf), buf, sizeof(buf), &len);
     if (S_OK == g_hresult) {
-        Value s = String::TRef(buf, len);
-        s.str().isbin(true);
-        rpc.retn(s);
+        auto str = String::TRef(buf, len);
+        str.str().isbin(true);
+        rpc.retn(str);
     }
 }
 
@@ -94,6 +123,8 @@ static void search(Session& rpc, Tuple& args) {
 FuncItem debug_spaces_funcs[] = {
     {"read", read},
     {"write", write},
+    {"readphy", readphy},
+    {"writephy", writephy},
     {"readstr", readstr},
     {"readustr", readustr},
     {"readptr", readptr},

@@ -4,6 +4,36 @@ from . import srpc
 from .K import ERROR, ENGOPT, EVENT, STATUS, END
 from threading import Thread, Event
 
+# WDbg object
+_wdbg = None
+
+class Breakpoint:
+    '''
+    Breakpoint represents a breakpoint
+
+    Attribute:
+        callback:callable         will be invoked when the breakpoint is occured
+    '''
+    _dict = {}
+
+    def __init__(self, id):
+        self.id = id
+        Breakpoint._dict[id] = self
+
+    def _get(id):
+        return Breakpoint._dict.get(id)
+
+    def enable(self, b = True):
+        '''enable or disable this breakpoint'''
+        global _wdbg
+        return _wdbg.enablebp(self.id, b)
+
+    def remove(self):
+        '''remove this breakpoint'''
+        global _wdbg
+        del Breakpoint._dict[self.id]
+        return _wdbg.rmbp(self.id)
+
 # Auxiliary session's handler
 class AuxHandler:
     def heartbeat(ss, n):
@@ -17,68 +47,84 @@ class MainHandler:
     def output(ss, data):
         print(data.decode('gbk'), end = '')
 
-backfset = set(['waitevent'])
+    def BREAKPOINT(ss, id):
+        bp = Breakpoint._get(id)
+        if bp and bp.callback:
+            return bp.callback(bp)
 
 class WDbg:
     def __init__(self):
-        self._taskcond = Event()    # condition for waitting task
-        self._compcond = Event()    # condition for waitting to complete task
+        self._taskev = Event()    # event for waitting task
+        self._compev = Event()    # event for waitting to complete task
         def backthread():
             while True:
-                self._taskcond.clear()
-                self._taskcond.wait()
-                self._result = self._fun(*self._args)
-                self._compcond.set()
+                self._taskev.clear()
+                self._taskev.wait()
+                self._result = self._back_fun(*self._back_args)
+                self._compev.set()
         self._back = Thread(target = backthread)
         self._back.start()
 
     def __getattr__(self, name):
-        global backfset
-
         mss = self._mss
-        f = None
-        if name in backfset:
-            def fun(*args):
-                self._args = (name, *args)
-                self._fun = mss.call
-                return self._backrun()
-            f = fun
-        else:
-            def func(*args):
-                return mss.call(name, *args)
-            f = func
-        setattr(self, name, f)
-        return f
+        def func(*args):
+            return mss.call(name, *args)
+        setattr(self, name, func)
+        return func
 
-    def _backrun(self):
-        self._compcond.clear()
-        self._taskcond.set()
+    def _back_run(self, fun, args = ()):
+        '''run some procedure in background'''
+        self._back_fun = fun
+        self._back_args = args
+        self._compev.clear()
+        # run in background
+        self._taskev.set()
+
+    # wait the backrun return
+    def _wait_back(self, timeout = None):
+        if timeout:
+            return self._compev.wait(timeout)
         while True:
             try:
-                if self._compcond.wait(0.2):
+                if self._compev.wait(0.2):
                     break
             except KeyboardInterrupt:
                 self.interrupt()
         return self._result
 
-    def init(self):
-        # output callback
-        if getattr(MainHandler, 'output'):
-            self.setoutput('output')
-        # load rc file
-        f = os.path.expanduser('~/_wdbgrc.py')
+    def _load_config(self):
+        f = os.path.expanduser('~/_wdbgconf.py')
         try:
-            with open(f) as rc:
-                exec(rc.read(), {'wdbg': self})
-            print('rc file loaded success!')
+            with open(f) as conf:
+                exec(conf.read(), {'wdbg': self})
+            print('[configure] loaded success!')
         except OSError:
             pass
         except Exception as e:
-            print('Exception raised during load rc file:', e)
+            print('[configure] loaded failure:', e)
+
+    def init(self):
+        # output callback
+        self.setoutput('output')
+        self.event('BREAKPOINT', MainHandler.BREAKPOINT)
+        # load configure file
+        self._load_config()
+
+    def waitevent(self, timeout = None):
+        self._back_run(self._mss.call, ('waitevent', timeout))
+        return self._wait_back()
 
     def interrupt(self):
         self._ass.notify('interrupt')
         return self
+
+    def addbp(self, pos, *args):
+        '''add a breakpoint'''
+        id = self._mss.call('addbp', pos, *args)
+        if type(id) is int:
+            bp = Breakpoint(id)
+            bp.pos = pos
+            return bp
 
     def stepinto(self):
         self.status(STATUS.STEP_INTO)
@@ -89,16 +135,20 @@ class WDbg:
         return self
 
     def go(self):
+        '''continue to run'''
         self.status(STATUS.GO)
         return self
 
     def end_detach(self):
+        '''end the debug session and detach target'''
         return self.end(END.ACTIVE_DETACH)
 
     def end_term(self):
+        '''end the debug session and terminate target'''
         return self.end(END.ACTIVE_TERMINATE)
 
     def cmdloop(self):
+        '''startup a command loop'''
         while True:
             try:
                 cmd = input(self.prompt() + ' > ')
@@ -114,6 +164,7 @@ class WDbg:
                 break
 
     def event(self, name, func = None):
+        '''register a event handler,'''
         try:
             if func:
                 origin = self.event(name)
@@ -163,9 +214,6 @@ def start_local(arch = 'x86', path = None):
     port = re.search(r'\d+', line)
     if port:
         return int(port.group(0))
-
-# WDbg object
-_wdbg = None
 
 def connect(addr = None, port = None):
     global _wdbg
