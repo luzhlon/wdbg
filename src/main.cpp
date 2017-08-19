@@ -5,6 +5,12 @@
 #include <iostream>
 #include <thread>
 
+#ifdef _WIN64
+#define WDBG_ARCH "x64"
+#else
+#define WDBG_ARCH "x86"
+#endif // _WIN64
+
 using namespace std;
 using namespace srpc;
 
@@ -23,8 +29,9 @@ void aux_thread() {
     // Startup the heartbeat-detect thread
     thread t([](){
         for (uint64_t i = last_num; ; ++i) {
+            if (g_ass->isclosed())
+                return;
             g_ass->notify("heartbeat", i);
-            // printf("Sended heartbeat %lld\n", i);
             this_thread::sleep_for(chrono::seconds(1));
             if (last_num != i) {
                 printf("[LOSED CONNECTION]\n");
@@ -47,8 +54,8 @@ static void print_version() {
     static int major_ver = 0;
     static int minor_ver = 1;
     printf(
-        "wdbg v%d.%d, A debugger for windows based Microsoft's dbgeng\n",
-        major_ver, minor_ver);
+        "wdbg(%s) v%d.%d, A debugger for windows based Microsoft's dbgeng\n",
+        WDBG_ARCH, major_ver, minor_ver);
 }
 
 static void print_help() {
@@ -96,7 +103,8 @@ int main(int argc, char **argv) {
     while (!ser.bind(f_ipaddr, f_port))
         ++f_port;
     ser.listen();
-    cout << "[PORT]: " << f_port << endl;
+    cout << "[PORT] " << f_port << endl;
+    cout << "[ARCH] " << WDBG_ARCH << endl;
     // Main session and auxiliary session
     Session mss, ass;
     do {
@@ -108,14 +116,16 @@ int main(int argc, char **argv) {
         thread t(aux_thread); t.detach();
         mss.onopen = [](Session& s) {
             wdbg::init();
+            g_ss->notify("tellinfo", WDBG_ARCH);
         };
         mss.onclose = [](Session& s, bool exp) {
             if (exp) {
-                printf("[EXITED EXCEPTED]: EndSession\n");
-                g_client->EndSession(DEBUG_END_ACTIVE_TERMINATE);
+                printf("[EXIT] Abnormally\n");
             } else {
-                printf("[EXITED NORMALLY]\n");
+                printf("[EXIT] Normally\n");
             }
+            g_client->EndSession(DEBUG_END_ACTIVE_TERMINATE);
+            g_ass->close();
         };
         mss.run();
     } while (f_deamon);

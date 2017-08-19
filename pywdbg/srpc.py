@@ -3,13 +3,16 @@ import umsgpack as msgpack
 from .tstream import TcpStream
 from threading import RLock
 
-MSG_INVALID = 0
-MSG_CALL    = 1
-MSG_NOTIFY  = 2
-MSG_RETURN  = 3
-MSG_EXCEPT  = 4
+# Base type
+MSG_INVOKE = 0x10
+MSG_RETURN = 0x20
+# Concrete type
+MSG_CALL   = MSG_INVOKE | 0x00
+MSG_NOTIFY = MSG_INVOKE | 0x01
+MSG_CLOSE  = MSG_INVOKE | 0x02
 
-ERR_NO_FUNC = 0
+MSG_NOFUNC = MSG_RETURN | 0x00
+MSG_RETVAL = MSG_RETURN | 0x01
 
 class Handler:
     pass
@@ -18,6 +21,7 @@ class Session:
     def __init__(self, io):
         self._io = io
         self._mutex = RLock()
+        self.isclosed = False
         self.handler = Handler
         self.onopen = lambda session: None
         self.onclose = lambda session: None
@@ -38,16 +42,18 @@ class Session:
         self._lastfid = fid
         return b
 
-    def _return(self, v):
+    def close(self):
         self._mutex.acquire()
-        self._pack = [MSG_RETURN, v]
+        self._pack = [MSG_CLOSE]
         b = self._send_pack()
         self._mutex.release()
+        self._io.close()
+        self._closed = True
         return b
 
-    def _except(self, code):
+    def _return(self, v, t = MSG_RETVAL):
         self._mutex.acquire()
-        self._pack = [MSG_EXCEPT, code]
+        self._pack = [t, v]
         b = self._send_pack()
         self._mutex.release()
         return b
@@ -57,22 +63,27 @@ class Session:
         self.onopen(self)
         while self._recv_pack():
             self._handle_invoke()
+            if self.isclosed:
+                break
         self.onclose(self)
 
     def _recv_pack(self):
+        if self.isclosed:
+            return False
         try:
             self._pack = msgpack.unpack(self._io)
             return True
         except msgpack.UnpackException as e:
-            print("Unpack failure", e)
             return False
         except Exception as e:
             print("Receive package failure", e)
             return False
 
     def _send_pack(self):
+        if self.isclosed:
+            return False
         try:
-            self._pack = msgpack.pack(self._pack, self._io)
+            msgpack.pack(self._pack, self._io)
             self._io.flush()
             return True
         except Exception as e:
@@ -85,42 +96,41 @@ class Session:
     # Wait a value from subprocess
     def _wait_return(self):
         while self._recv_pack():
-            if self._type() == MSG_RETURN:
+            t = self._type()
+            if t & 0xF0 == MSG_INVOKE:
+                self._handle_invoke()   # handle invoke
+            elif t == MSG_RETVAL:
                 pack = self._pack
                 return pack[1:] if len(pack) > 2 else pack[1]
-            elif self._type() == MSG_EXCEPT:
+            elif t == MSG_NOFUNC:
                 raise Exception('No such function: ' + self._lastfid)
             else:
-                self._handle_invoke()   # handle invoke
+                raise Exception('Unkown flag')
 
     # Handle a invoke
     def _handle_invoke(self):
         t = self._type()
-        assert t == MSG_CALL or t == MSG_NOTIFY
-        pack = self._pack
-        funid = pack[1]
-        ret = None
-        try:
-            fun = self._getfunc(funid)
-            if fun:
-                ret = fun(self, *pack[2:])
-            elif self._type() == MSG_CALL:
-                return self._except(ERR_NO_FUNC)
-        except Exception as e:
-            print('Throwed a exception during:', funid, e)
+        assert t & 0xF0 == MSG_INVOKE
+        if t == MSG_CLOSE:
+            self.isclosed = True
+        else:
+            pack = self._pack
+            fid = pack[1]
             ret = None
-        except TypeError as e:
-            print('Args\'s number not matched:', funid, e)
-        finally:
-            if t == MSG_CALL:
-                self._return(ret)
-
-    # Get function in handler
-    def _getfunc(self, fid):
-        try:
-            return getattr(self.handler, fid)
-        except AttributeError:
-            return None
+            try:
+                fun = vars(self.handler).get(fid)
+                if fun:
+                    ret = fun(self, *pack[2:])
+                elif self._type() == MSG_CALL:
+                    return self._return(None, MSG_NOFUNC)
+            except Exception as e:
+                print('Throwed a exception during:', fid, e)
+                ret = None
+            except TypeError as e:
+                print('Args\'s number not matched:', fid, e)
+            finally:
+                if t == MSG_CALL:
+                    self._return(ret)
 
 
 class Client(Session):

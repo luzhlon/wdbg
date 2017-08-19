@@ -30,21 +30,21 @@ target("wdbg")
 
     on_package(function(target)
         -- copy file for plugin development
-        os.cp('$(projectdir)/deps/srpc/src/*.h*', 'dist/inc')
-        os.cp('$(projectdir)/deps/xval/src/*.h', 'dist/inc')
-        os.cp('$(projectdir)/src/*.h', 'dist/inc')
-        os.cp('$(buildir)/srpc.lib', 'dist/lib/$(arch)')
-        os.cp('$(buildir)/wdbg.lib', 'dist/lib/$(arch)')
-        os.cp('$(projectdir)/deps/dbgeng/inc/*.h', 'dist/inc')
-        os.cp('$(projectdir)/deps/dbgeng/lib/$(arch)', 'dist/lib/$(arch)')
+        os.cp('$(projectdir)/deps/srpc/src/*.h*', 'wdbg-dist/inc')
+        os.cp('$(projectdir)/deps/xval/src/*.h', 'wdbg-dist/inc')
+        os.cp('$(projectdir)/src/*.h', 'wdbg-dist/inc')
+        os.cp('$(buildir)/srpc.lib', 'wdbg-dist/lib/$(arch)')
+        os.cp('$(buildir)/wdbg.lib', 'wdbg-dist/lib/$(arch)')
+        os.cp('$(projectdir)/deps/dbgeng/inc/*.h', 'wdbg-dist/inc')
+        os.cp('$(projectdir)/deps/dbgeng/lib/$(arch)', 'wdbg-dist/lib')
         -- copy file about dbgeng
-        copy_dbgengfiles(os, 'dist/bin/$(arch)')
+        copy_dbgengfiles(os, 'wdbg-dist/bin/$(arch)')
         -- copy the binary files
-        os.cp('$(buildir)/$(mode)/$(arch)/srpc.dll', 'dist/bin/$(arch)')
-        os.cp('$(buildir)/$(mode)/$(arch)/wdbg.exe', 'dist/bin/$(arch)')
+        os.cp('$(buildir)/$(mode)/$(arch)/srpc.dll', 'wdbg-dist/bin/$(arch)')
+        os.cp('$(buildir)/$(mode)/$(arch)/wdbg.exe', 'wdbg-dist/bin/$(arch)')
         -- copy the script files
-        os.cp('$(projectdir)/pywdbg', 'dist')
-        os.cp('$(projectdir)/examples', 'dist')
+        os.cp('$(projectdir)/pywdbg', 'wdbg-dist')
+        os.cp('$(projectdir)/examples', 'wdbg-dist')
     end)
 
     add_deps 'srpc'

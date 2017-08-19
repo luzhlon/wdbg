@@ -1,5 +1,6 @@
 
-import time, os
+import time, os, re
+
 from . import srpc
 from .K import ERROR, ENGOPT, EVENT, STATUS, END
 from threading import Thread, Event
@@ -41,6 +42,11 @@ class AuxHandler:
 
 # Main session's handler
 class MainHandler:
+    def tellinfo(ss, data):
+        global _wdbg
+
+        _wdbg._arch = data
+
     def Input(ss, data):
         return input()
 
@@ -49,13 +55,17 @@ class MainHandler:
 
     def BREAKPOINT(ss, id):
         bp = Breakpoint._get(id)
-        if bp and bp.callback:
-            return bp.callback(bp)
+        if bp and 'callback' in vars(bp):
+            try:
+                return bp.callback(bp)
+            except Exception as e:
+                print(e)
 
 class WDbg:
     def __init__(self):
         self._taskev = Event()    # event for waitting task
         self._compev = Event()    # event for waitting to complete task
+
         def backthread():
             while True:
                 self._taskev.clear()
@@ -67,6 +77,7 @@ class WDbg:
 
     def __getattr__(self, name):
         mss = self._mss
+
         def func(*args):
             return mss.call(name, *args)
         setattr(self, name, func)
@@ -118,12 +129,14 @@ class WDbg:
         self._ass.notify('interrupt')
         return self
 
-    def addbp(self, pos, *args):
+    def addbp(self, pos, callback = None, *args):
         '''add a breakpoint'''
         id = self._mss.call('addbp', pos, *args)
         if type(id) is int:
             bp = Breakpoint(id)
             bp.pos = pos
+            if callback:
+                bp.callback = callback
             return bp
 
     def stepinto(self):
@@ -149,9 +162,13 @@ class WDbg:
 
     def cmdloop(self):
         '''startup a command loop'''
+
+        exitcmd = self._exitcmd if hasattr(self, '_exitcmd') else '..'
         while True:
             try:
                 cmd = input(self.prompt() + ' > ')
+                if cmd == exitcmd:
+                    break
                 b = self.exec(cmd)
                 if b:
                     print('[Execute failure]', cmd)
@@ -195,25 +212,23 @@ def search_wdbg(arch):
 def start_local(arch = 'x86', path = None):
     '''start the wdbg subprocess, and return its listened port'''
 
+    path = path or search_wdbg(arch)
     if not path:
-        path = search_wdbg(arch)
-        if not path:
-            return None
+        return None
 
-    from subprocess import STARTUPINFO, Popen, SW_HIDE
-    from subprocess import CREATE_NEW_CONSOLE, STARTF_USESHOWWINDOW, PIPE
+    from subprocess import STARTUPINFO, SW_HIDE, PIPE
+    from subprocess import CREATE_NEW_CONSOLE, STARTF_USESHOWWINDOW
+    from subprocess import SubprocessError, Popen
 
     si = STARTUPINFO()
     si.dwFlags = STARTF_USESHOWWINDOW
     si.wShowWindow = SW_HIDE
-    wdbg = Popen([path, '-D', '-a', '127.0.0.1'],
-                 bufsize = 0, startupinfo = si, stdin = PIPE,
-                 creationflags = CREATE_NEW_CONSOLE, stdout = PIPE)
-    import re
-    line = wdbg.stdout.readline().decode()
-    port = re.search(r'\d+', line)
-    if port:
-        return int(port.group(0))
+    try:
+        return Popen([path, '-D', '-a', '127.0.0.1'],
+                  bufsize = 0, startupinfo = si, stdin = PIPE,
+                  creationflags = CREATE_NEW_CONSOLE, stdout = PIPE)
+    except SubprocessError:
+        return None
 
 def connect(addr = None, port = None):
     global _wdbg
@@ -230,12 +245,21 @@ def connect(addr = None, port = None):
         Thread(target = _wdbg._ass.run).start()
 
         _wdbg.init()
-        return _wdbg
+    return _wdbg
+
+def read_port(wdbg):
+    line = wdbg.stdout.readline().decode()
+    port = re.search(r'\d+', line)
+    if port:
+        return int(port.group(0))
 
 def startup(arch = 'x86', path = None):
     '''startup the wdbg subprocess and connect it, return the WDbg object'''
 
-    port = start_local(arch, path)
+    wdbg = start_local(arch, path)
+    if not wdbg:
+        return
+    port = read_port(wdbg)
     if port:
-        return connect('127.0.0.1', port)
-
+        wd = connect('127.0.0.1', port)
+        return wd
