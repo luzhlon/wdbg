@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+  <title>docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/docute@3/dist/docute.css">
+</head>
+<body>
+  <div id="app"></div>
+  <script src="https://unpkg.com/docute@3/dist/docute.js"></script>
+  <script src="https://unpkg.com/docute/plugins/docsearch.js"></script>
+  <script src="https://unpkg.com/docute-evanyou"></script>
+  <script src="https://unpkg.com/prismjs/components/prism-python.js"></script>
+  <script>
+    docute.init({
+      sidebar: true,
+      announcement: {
+        type: 'success', // warning | danger | success | primary
+        html: 'Welcome to the document for wdbg !'
+      },
+      home: 'quick-start.md',
+      nav: [
+        // homepage
+        {title: '快速开始', path: '/'},
+        {title: 'PYWDBG-API', path: './pywdbg-api'},
+        {title: 'RPC-API', path: './rpc-api'},
+        {title: '编写插件', path: './write-plugin'}
+      ],
+      icons: [{
+        icon: 'github',
+        label: 'Contribute on GitHub',
+        link: 'https://github.com/luzhlon/wdbg'
+      }],
+      plugins: [
+        evanyou()
+      ]
+    })
+  </script>
+</body>
+</html>
