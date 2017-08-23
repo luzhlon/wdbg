@@ -81,61 +81,92 @@ static void waitevent(Session& rpc, Tuple& args) {
     g_hresult = g_ctrl->WaitForEvent(0, args[0].Int(INFINITE));
     rpc.retn((uint64_t)g_hresult);
 }
-
-auto type_s = "type"_x;
-auto id_s = "id"_x;
-auto enable_s = "enable"_x;
-auto command_s = "command"_x;
-auto thread_s = "thread"_x;
-auto flags_s = "flags"_x;
-
-static void addbp(Session& rpc, Tuple& args) {
+// Access breakpoint
+static void addba(Session& rpc, Tuple& args) {
     IDebugBreakpoint2 *bp;
     auto offset = args[0];
-    auto opts = args[1];
-    ULONG type = opts[type_s].Int(DEBUG_BREAKPOINT_CODE);
-    ULONG id = opts[id_s].Int(DEBUG_ANY_ID);
-    PCSTR cmd = opts[command_s];
-    bool enable = opts[enable_s].Bool(true);
-    ULONG thread = opts[thread_s].Int(0);
-    g_hresult = g_ctrl->AddBreakpoint2(type, id, &bp);
+    ULONG type = args[1].Int(DEBUG_BREAK_READ),
+          size = args[2].Int(1), id;
+    g_hresult = g_ctrl->AddBreakpoint2(DEBUG_BREAKPOINT_DATA, DEBUG_ANY_ID, &bp);
     if (S_OK == g_hresult) {
         if (offset.isint())
             bp->SetOffset(offset);
         else if (offset.isstr())
             bp->SetOffsetExpression(offset);
-        if (enable) bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
-        if (cmd) bp->SetCommand(cmd);
-        if (thread) bp->SetMatchThreadId(thread);
-        if (type == DEBUG_BREAKPOINT_DATA) {
-            bp->SetDataParameters(opts["access_size"_x].Int(1),
-                opts["access_type"_x].Int(DEBUG_BREAK_READ));
-        }
+        bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
+        bp->SetDataParameters(size, type);
+        ULONG id;
         if (S_OK == bp->GetId(&id))
             rpc.retn((uint64_t)id);
     }
 }
+// Code breakpoint
+static void addbp(Session& rpc, Tuple& args) {
+    IDebugBreakpoint2 *bp;
+    auto offset = args[0];
+    ULONG id;
+    g_hresult = g_ctrl->AddBreakpoint2(DEBUG_BREAKPOINT_CODE, DEBUG_ANY_ID, &bp);
+    if (S_OK == g_hresult) {
+        if (offset.isint())
+            bp->SetOffset(offset);
+        else if (offset.isstr())
+            bp->SetOffsetExpression(offset);
+        bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
+        if (S_OK == bp->GetId(&id))
+            rpc.retn((uint64_t)id);
+    }
+}
+static IDebugBreakpoint2 *getbp(const Value& id) {
+    IDebugBreakpoint2 *bp;
+    if (id.isint() && g_ctrl->GetBreakpointById2(id.Int(), &bp) == S_OK)
+        return bp;
+    return nullptr;
+}
 // Remove a breakpoint
 static void rmbp(Session& rpc, Tuple& args) {
-    if (args[0].isint()) {
-        ULONG id = args[0].Int();
-        IDebugBreakpoint2 *bp;
-        g_ctrl->GetBreakpointById2(id, &bp);
+    auto bp = getbp(args[0]);
+    if (bp) {
         g_hresult = g_ctrl->RemoveBreakpoint2(bp);
         rpc.retn((uint64_t)g_hresult);
     }
 }
 // Enable or disable a breakpoint
 static void enablebp(Session& rpc, Tuple& args) {
-    if (args[0].isint()) {
-        ULONG id = args[0].Int();
-        IDebugBreakpoint2 *bp;
-        if (S_OK == g_ctrl->GetBreakpointById2(id, &bp)) {
-            if (args[1].Bool(true))
-                g_hresult = bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
-            else
-                g_hresult = bp->RemoveFlags(DEBUG_BREAKPOINT_ENABLED);
-            rpc.retn((uint64_t)g_hresult);
+    auto bp = getbp(args[0]);
+    if (bp) {
+        if (args[1].Bool(true))
+            g_hresult = bp->AddFlags(DEBUG_BREAKPOINT_ENABLED);
+        else
+            g_hresult = bp->RemoveFlags(DEBUG_BREAKPOINT_ENABLED);
+        rpc.retn((uint64_t)g_hresult);
+    }
+}
+// Get/set breakpoint's command
+static void bpcmd(Session& rpc, Tuple& args) {
+    auto bp = getbp(args[0]);
+    if (bp) {
+        if (args[1].isstr()) {
+            g_hresult = bp->SetCommand(args[1]);
+        } else {
+            char buf[1024];
+            ULONG size;
+            g_hresult = bp->GetCommand(buf, sizeof(buf), &size);
+            if (g_hresult == S_OK)
+                rpc.retn(String::TRef(buf, size));
+        }
+    }
+}
+// Get/set breakpoint's match id
+static void bpthread(Session& rpc, Tuple& args) {
+    auto bp = getbp(args[0]);
+    if (bp) {
+        if (args[1].isint()) {
+            g_hresult = bp->SetMatchThreadId(args[1].Int());
+        } else {
+            ULONG tid;
+            g_hresult = bp->GetMatchThreadId(&tid);
+            if (g_hresult == S_OK)
+                rpc.retn((uint64_t)tid);
         }
     }
 }
@@ -211,8 +242,11 @@ FuncItem debug_control_funcs[] = {
     // {"asm", asm},
     {"disasm", disasm},
     {"addbp", addbp},
+    {"addba", addba},
     {"rmbp", rmbp},
     {"enablebp", enablebp},
+    {"bpcmd", bpcmd},
+    {"bpthread", bpthread},
     {"retpos", retpos},
     {"asmopts", asmopts},
     {"interrupt", interrupt},

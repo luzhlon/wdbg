@@ -1,15 +1,10 @@
 
 #include "wdbg.h"
+#include "config.h"
 
 #include <Windows.h>
 #include <iostream>
 #include <thread>
-
-#ifdef _WIN64
-#define WDBG_ARCH "x64"
-#else
-#define WDBG_ARCH "x86"
-#endif // _WIN64
 
 using namespace std;
 using namespace srpc;
@@ -34,7 +29,7 @@ void aux_thread() {
             g_ass->notify("heartbeat", i);
             this_thread::sleep_for(chrono::seconds(1));
             if (last_num != i) {
-                printf("[LOSED CONNECTION]\n");
+                printf("[DISCONNECTED]\n");
                 break;
             }
         }
@@ -51,11 +46,9 @@ unsigned short f_port = 5100;
 const char *f_ipaddr = "0.0.0.0";
 
 static void print_version() {
-    static int major_ver = 0;
-    static int minor_ver = 1;
     printf(
-        "wdbg(%s) v%d.%d, A debugger for windows based Microsoft's dbgeng\n",
-        WDBG_ARCH, major_ver, minor_ver);
+        "wdbg(%s) v%s, A debugger for windows based Microsoft's dbgeng\n",
+        WDBG_ARCH, WDBG_VERSION);
 }
 
 static void print_help() {

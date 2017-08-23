@@ -1,7 +1,8 @@
 .*/
+.*
 vs20*/
 build/
 **/__pycache__/
-dist/
-wdbg-dist/*/
+*dist/
+*.zip
 *.exe

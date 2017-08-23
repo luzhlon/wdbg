@@ -65,6 +65,7 @@ class WDbg:
     def __init__(self):
         self._taskev = Event()    # event for waitting task
         self._compev = Event()    # event for waitting to complete task
+        self._exitcmd = '..'
 
         def backthread():
             while True:
@@ -163,11 +164,10 @@ class WDbg:
     def cmdloop(self):
         '''startup a command loop'''
 
-        exitcmd = self._exitcmd if hasattr(self, '_exitcmd') else '..'
         while True:
             try:
                 cmd = input(self.prompt() + ' > ')
-                if cmd == exitcmd:
+                if cmd == self._exitcmd:
                     break
                 b = self.exec(cmd)
                 if b:
