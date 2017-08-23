@@ -14,7 +14,7 @@
 
 ![](./demo.gif)
 
-关于pywdbg的使用，你可以看[wiki](https://github.com/luzhlon/wdbg/wiki) [pywdbg-wiki](https://github.com/luzhlon/wdbg/wiki/pywdbg)
+文档：https://luzhlon.github.io/wdbg/index.html
 
 ## Features
 
